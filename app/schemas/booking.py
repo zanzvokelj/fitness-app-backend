@@ -16,11 +16,11 @@ class BookingOut(BaseModel):
 
 class AdminBookingOut(BaseModel):
     id: int
-    user_id: int
-    session_id: int
     status: str
     created_at: datetime
-    status: str
+
+    user_id: int
+    session_id: int
 
     class Config:
         from_attributes = True

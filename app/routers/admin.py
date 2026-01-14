@@ -10,7 +10,13 @@ from app.models.class_type import ClassType
 from app.models.booking import Booking
 from app.schemas.session import SessionCreate, SessionOut, SessionCapacityUpdate
 from app.schemas.booking import AdminBookingOut
-
+from app.models.user import User
+from app.schemas.ticket_plan import TicketPlanOut
+from app.schemas.user import AdminUserOut
+from app.models.ticket import Ticket
+from app.schemas.ticket import AdminTicketOut
+from app.schemas.ticket import AdminAssignTicket
+from app.models.ticket_plan import TicketPlan
 
 router = APIRouter(
     prefix="/api/v1/admin",
@@ -56,28 +62,6 @@ def create_session(
 
     return session
 
-
-@router.post("/tickets/seed")
-def seed_ticket(
-    db: Session = Depends(get_db),
-    admin=Depends(require_admin),
-):
-    from app.models.ticket import Ticket
-
-    now = datetime.now(UTC)
-
-    ticket = Ticket(
-        user_id=admin.id,
-        type="monthly",
-        valid_from=now,
-        valid_until=now + timedelta(days=30),
-        is_active=True,
-    )
-
-    db.add(ticket)
-    db.commit()
-
-    return {"status": "ticket created"}
 
 
 @router.patch("/sessions/{session_id}/capacity", response_model=SessionOut)
@@ -163,3 +147,172 @@ def view_bookings(
         )
 
     return query.order_by(Booking.created_at.desc()).all()
+
+
+
+@router.get("/sessions", response_model=list[SessionOut])
+def list_sessions(
+    center_id: int | None = None,
+    day: date | None = None,
+    db: Session = Depends(get_db),
+    admin=Depends(require_admin),
+):
+    query = db.query(TrainingSession).join(ClassType)
+
+    if center_id:
+        query = query.filter(TrainingSession.center_id == center_id)
+
+    if day:
+        start = datetime(day.year, day.month, day.day, tzinfo=UTC)
+        end = start + timedelta(days=1)
+        query = query.filter(
+            TrainingSession.start_time >= start,
+            TrainingSession.start_time < end,
+        )
+
+    return query.order_by(TrainingSession.start_time).all()
+
+
+
+@router.get("/users", response_model=list[AdminUserOut])
+def list_users(
+    db: Session = Depends(get_db),
+    admin=Depends(require_admin),
+):
+    return (
+        db.query(User)
+        .order_by(User.created_at.desc())
+        .all()
+    )
+
+
+
+@router.get("/tickets", response_model=list[AdminTicketOut])
+def list_active_tickets(
+    db: Session = Depends(get_db),
+    admin=Depends(require_admin),
+):
+    now = datetime.now(UTC)
+
+    return (
+        db.query(Ticket)
+        .filter(
+            Ticket.is_active.is_(True),
+            Ticket.valid_until >= now,
+        )
+        .order_by(Ticket.valid_until)
+        .all()
+    )
+
+
+@router.post("/tickets/assign")
+def assign_ticket(
+    data: AdminAssignTicket,
+    db: Session = Depends(get_db),
+    admin=Depends(require_admin),
+):
+    plan = db.query(TicketPlan).filter(
+        TicketPlan.id == data.plan_id,
+        TicketPlan.is_active.is_(True),
+    ).first()
+
+    if not plan:
+        raise HTTPException(404, "Ticket plan not found")
+
+    now = datetime.now(UTC)
+
+    valid_until = (
+        now + timedelta(days=plan.duration_days)
+        if plan.duration_days
+        else now + timedelta(days=365 * 10)  # “unlimited”
+    )
+
+    ticket = Ticket(
+        user_id=data.user_id,
+        center_id=data.center_id,
+        plan_id=data.plan_id,
+        valid_from=now,
+        valid_until=valid_until,
+        is_active=True,
+    )
+
+    db.add(ticket)
+    db.commit()
+
+    return {"status": "ticket assigned"}
+
+
+
+@router.patch("/tickets/{ticket_id}/deactivate")
+def deactivate_ticket(
+    ticket_id: int,
+    db: Session = Depends(get_db),
+    admin=Depends(require_admin),
+):
+    ticket = db.query(Ticket).filter(
+        Ticket.id == ticket_id,
+        Ticket.is_active.is_(True),
+    ).first()
+
+    if not ticket:
+        raise HTTPException(404, "Active ticket not found")
+
+    ticket.is_active = False
+    db.commit()
+
+    return {"status": "ticket deactivated"}
+
+
+
+@router.get("/users/{user_id}/tickets", response_model=list[AdminTicketOut])
+def user_ticket_history(
+    user_id: int,
+    db: Session = Depends(get_db),
+    admin=Depends(require_admin),
+):
+    return (
+        db.query(Ticket)
+        .filter(Ticket.user_id == user_id)
+        .order_by(Ticket.created_at.desc())
+        .all()
+    )
+
+
+
+
+@router.get("/ticket-plans", response_model=list[TicketPlanOut])
+def admin_ticket_plans(
+    db: Session = Depends(get_db),
+    admin=Depends(require_admin),
+):
+    return db.query(TicketPlan).order_by(TicketPlan.price_cents).all()
+
+
+
+@router.patch("/users/{user_id}/role")
+def update_user_role(
+    user_id: int,
+    role: str,
+    db: Session = Depends(get_db),
+    admin=Depends(require_admin),
+):
+    user = db.query(User).get(user_id)
+    if not user:
+        raise HTTPException(404, "User not found")
+
+    user.role = role
+    db.commit()
+    return {"status": "updated"}
+
+
+
+@router.patch("/users/{user_id}/deactivate")
+def deactivate_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    admin=Depends(require_admin),
+):
+    user = db.query(User).get(user_id)
+    user.is_active = False
+    db.commit()
+
