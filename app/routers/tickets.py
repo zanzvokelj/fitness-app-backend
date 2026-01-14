@@ -22,7 +22,7 @@ def get_active_ticket(
 ):
     now = datetime.now(UTC)
 
-    return (
+    ticket = (
         db.query(Ticket)
         .filter(
             Ticket.user_id == user.id,
@@ -34,3 +34,14 @@ def get_active_ticket(
         .order_by(Ticket.valid_until.desc())
         .first()
     )
+
+    if not ticket:
+        return None
+
+    return {
+        "id": ticket.id,
+        "type": ticket.plan.code,   # ali ticket.plan.name
+        "valid_from": ticket.valid_from,
+        "valid_until": ticket.valid_until,
+        "is_active": ticket.is_active,
+    }
