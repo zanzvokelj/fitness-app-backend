@@ -21,17 +21,18 @@ def get_active_ticket(
 ):
     now = datetime.now(UTC)
 
-    ticket = (
+    return (
         db.query(Ticket)
         .filter(
             Ticket.user_id == user.id,
             Ticket.center_id == center_id,
-            Ticket.is_active == True,
+            Ticket.is_active.is_(True),
             Ticket.valid_from <= now,
             Ticket.valid_until >= now,
         )
-        .order_by(Ticket.valid_until.desc())
+        .order_by(
+            Ticket.remaining_entries.is_(None),
+            Ticket.valid_until.desc(),
+        )
         .first()
     )
-
-    return ticket

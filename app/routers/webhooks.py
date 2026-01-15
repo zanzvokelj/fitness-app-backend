@@ -80,11 +80,12 @@ async def stripe_webhook(
             db.query(Ticket)
             .filter(
                 Ticket.user_id == order.user_id,
-                Ticket.plan_id == plan.id,
+                Ticket.center_id == 1,
                 Ticket.is_active.is_(True),
                 Ticket.remaining_entries.isnot(None),
+                Ticket.valid_until >= now,
             )
-            .order_by(Ticket.created_at.desc())
+            .order_by(Ticket.valid_until.desc())
             .first()
         )
 
@@ -92,7 +93,10 @@ async def stripe_webhook(
             existing_ticket.remaining_entries += plan.max_entries
             existing_ticket.is_active = True
             db.commit()
-            return {"status": "entries accumulated"}
+            return {
+                "status": "entries accumulated",
+                "added": plan.max_entries,
+            }
 
     # 🆕 CREATE NEW TICKET
     ticket = Ticket(
