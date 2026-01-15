@@ -6,7 +6,8 @@ from alembic import context
 from dotenv import load_dotenv
 from app.models import *
 from app.db.base import Base
-
+from app.models.order import Order
+from app.models.payment import Payment
 # Import ALL models so Alembic can detect tables
 from app.models.user import User
 from app.models.center import Center
@@ -47,6 +48,9 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
+        compare_type=True,
+        compare_server_default=True,
+        compare_indexes=False,
     )
 
     with context.begin_transaction():
@@ -66,6 +70,9 @@ def run_migrations_online() -> None:
         context.configure(
             connection=connection,
             target_metadata=target_metadata,
+            compare_type=True,
+            compare_server_default=True,
+            compare_indexes=False,
         )
 
         with context.begin_transaction():
@@ -76,3 +83,4 @@ if context.is_offline_mode():
     run_migrations_offline()
 else:
     run_migrations_online()
+
