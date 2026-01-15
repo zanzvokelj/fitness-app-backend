@@ -7,6 +7,9 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "Group Training Booking API"
     API_V1_STR: str = "/api/v1"
 
+    # Frontend
+    FRONTEND_URL: str = Field(..., env="FRONTEND_URL")
+
     # Security
     SECRET_KEY: str = Field(..., env="SECRET_KEY")
     ALGORITHM: str = "HS256"
@@ -15,6 +18,10 @@ class Settings(BaseSettings):
     # Database
     DATABASE_URL: str = Field(..., env="DATABASE_URL")
     TEST_DATABASE_URL: str | None = Field(default=None, env="TEST_DATABASE_URL")
+
+    # Stripe
+    STRIPE_SECRET_KEY: str = Field(..., env="STRIPE_SECRET_KEY")
+    STRIPE_WEBHOOK_SECRET: str = Field(..., env="STRIPE_WEBHOOK_SECRET")
 
     class Config:
         env_file = ".env"
