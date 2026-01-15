@@ -13,7 +13,7 @@ from app.models.ticket_plan import TicketPlan
 
 
 router = APIRouter(
-    prefix="/orders",
+    prefix="/api/v1/orders",
     tags=["orders"],
 )
 @router.post("/checkout")
