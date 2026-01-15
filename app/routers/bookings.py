@@ -107,11 +107,28 @@ def cancel_booking(
         .first()
     )
 
-    # 1️⃣ Cancel current booking
+    # 🔍 Najdi ticket, ki je veljaven za ta center
+    ticket = (
+        db.query(Ticket)
+        .filter(
+            Ticket.user_id == current_user.id,
+            Ticket.center_id == session.center_id,
+        )
+        .order_by(Ticket.created_at.desc())
+        .with_for_update()
+        .first()
+    )
+
+    # 1️⃣ Cancel booking
     booking.status = "cancelled"
     session.booked_count -= 1
 
-    # 2️⃣ Promote first waiting user (FIFO)
+    # 2️⃣ VRNI ENTRY (če gre za limited ticket)
+    if ticket and ticket.remaining_entries is not None:
+        ticket.remaining_entries += 1
+        ticket.is_active = True  # 🔑 reaktiviraj ticket
+
+    # 3️⃣ Promote first waiting user (FIFO)
     next_waiting = (
         db.query(Booking)
         .filter(
@@ -126,6 +143,8 @@ def cancel_booking(
     if next_waiting:
         next_waiting.status = "active"
         session.booked_count += 1
+        # ⚠️ entry se NE porabi tukaj
+        # porabi se samo ob create_booking
 
     db.commit()
 
