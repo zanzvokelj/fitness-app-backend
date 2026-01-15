@@ -1,6 +1,7 @@
 from datetime import datetime
 from pydantic import BaseModel
 from app.schemas.ticket_plan import TicketPlanOut
+from app.schemas.user import AdminUserOut
 
 
 class TicketOut(BaseModel):
@@ -22,7 +23,7 @@ class AdminTicketOut(BaseModel):
     valid_until: datetime
     remaining_entries: int | None
     is_active: bool
-
+    user: AdminUserOut
     plan: TicketPlanOut
 
     class Config:

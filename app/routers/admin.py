@@ -209,11 +209,14 @@ def list_active_tickets(
 
     return (
         db.query(Ticket)
+        .options(
+            selectinload(Ticket.user),
+            selectinload(Ticket.plan),
+        )
         .filter(
-            Ticket.is_active.is_(True),
             Ticket.valid_until >= now,
         )
-        .order_by(Ticket.valid_until)
+        .order_by(Ticket.created_at.desc())
         .all()
     )
 
