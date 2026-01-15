@@ -3,7 +3,7 @@ from datetime import datetime, UTC
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session as DBSession
 from sqlalchemy.exc import IntegrityError
-
+from app.core.dependencies import require_active_ticket, require_active_ticket_for_session
 from app.db import get_db
 from app.models.booking import Booking
 from app.models.session import Session
@@ -25,11 +25,10 @@ def create_booking(
     db: DBSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    now = datetime.now(UTC)
-
+    # 🔒 Lock session row
     session = (
         db.query(Session)
-        .filter(Session.id == session_id, Session.is_active == True)
+        .filter(Session.id == session_id, Session.is_active.is_(True))
         .with_for_update()
         .first()
     )
@@ -37,18 +36,14 @@ def create_booking(
     if not session:
         raise HTTPException(status_code=404, detail="Session not available")
 
-    ticket = db.query(Ticket).filter(
-        Ticket.user_id == current_user.id,
-        Ticket.center_id == session.center_id,
-        Ticket.is_active == True,
-        Ticket.valid_from <= now,
-        Ticket.valid_until >= now,
-    ).first()
+    # 🎟️ Validate active ticket for this session/center
+    ticket = require_active_ticket_for_session(
+        session=session,
+        current_user=current_user,
+        db=db,
+    )
 
-    if not ticket:
-        raise HTTPException(status_code=403, detail="No active ticket")
-
-
+    # ⏳ WAITING LIST (NO ENTRY CONSUMPTION)
     if session.booked_count >= session.capacity:
         booking = Booking(
             user_id=current_user.id,
@@ -60,7 +55,7 @@ def create_booking(
         db.refresh(booking)
         return booking
 
-
+    # ✅ ACTIVE BOOKING
     booking = Booking(
         user_id=current_user.id,
         session_id=session_id,
@@ -69,6 +64,12 @@ def create_booking(
 
     db.add(booking)
     session.booked_count += 1
+
+    # 🎟️ CONSUME ENTRY (only for limited plans)
+    if ticket.remaining_entries is not None:
+        ticket.remaining_entries -= 1
+        if ticket.remaining_entries <= 0:
+            ticket.is_active = False
 
     try:
         db.flush()

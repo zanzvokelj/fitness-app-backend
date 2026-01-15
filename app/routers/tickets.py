@@ -13,7 +13,6 @@ router = APIRouter(
     tags=["tickets"],
 )
 
-
 @router.get("/me/active", response_model=TicketOut | None)
 def get_active_ticket(
     center_id: int = Query(...),
@@ -35,13 +34,4 @@ def get_active_ticket(
         .first()
     )
 
-    if not ticket:
-        return None
-
-    return {
-        "id": ticket.id,
-        "type": ticket.plan.code,   # ali ticket.plan.name
-        "valid_from": ticket.valid_from,
-        "valid_until": ticket.valid_until,
-        "is_active": ticket.is_active,
-    }
+    return ticket

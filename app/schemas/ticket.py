@@ -8,10 +8,10 @@ class TicketOut(BaseModel):
     valid_from: datetime
     valid_until: datetime
     is_active: bool
+    plan: TicketPlanOut
 
     class Config:
         from_attributes = True
-
 
 class AdminTicketOut(BaseModel):
     id: int

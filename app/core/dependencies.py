@@ -1,6 +1,6 @@
 from datetime import datetime, UTC
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Query
 from jose import jwt, JWTError
 from sqlalchemy.orm import Session
 
@@ -50,24 +50,60 @@ def require_admin(
         )
     return current_user
 
-
 def require_active_ticket(
+    center_id: int = Query(...),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
-):
+) -> Ticket:
     now = datetime.now(UTC)
 
-    ticket = db.query(Ticket).filter(
-        Ticket.user_id == current_user.id,
-        Ticket.is_active.is_(True),
-        Ticket.valid_from <= now,
-        Ticket.valid_until >= now,
-    ).first()
+    ticket = (
+        db.query(Ticket)
+        .filter(
+            Ticket.user_id == current_user.id,
+            Ticket.center_id == center_id,
+            Ticket.is_active.is_(True),
+            Ticket.valid_from <= now,
+            Ticket.valid_until >= now,
+        )
+        .order_by(Ticket.valid_until.desc())
+        .first()
+    )
 
     if not ticket:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="No active ticket",
+            detail="Active ticket required",
+        )
+
+    return ticket
+
+
+
+def require_active_ticket_for_session(
+    session: Session,
+    current_user: User,
+    db: Session,
+) -> Ticket:
+    now = datetime.now(UTC)
+
+    ticket = (
+        db.query(Ticket)
+        .filter(
+            Ticket.user_id == current_user.id,
+            Ticket.center_id == session.center_id,
+            Ticket.is_active.is_(True),
+            Ticket.valid_from <= now,
+            Ticket.valid_until >= now,
+        )
+        .order_by(Ticket.valid_until.desc())
+        .first()
+    )
+
+    if not ticket:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Active ticket required",
         )
 
     return ticket
