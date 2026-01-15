@@ -176,7 +176,7 @@ def list_sessions(
         query = query.filter(TrainingSession.center_id == center_id)
 
     if day is not None:
-        start = datetime(day.year, day.month, day.day, tzinfo=UTC)
+        start = datetime.combine(day, datetime.min.time(), tzinfo=UTC)
         end = start + timedelta(days=1)
         query = query.filter(
             TrainingSession.start_time >= start,
@@ -246,6 +246,7 @@ def assign_ticket(
         plan_id=data.plan_id,
         valid_from=now,
         valid_until=valid_until,
+        remaining_entries=plan.max_entries,
         is_active=True,
     )
 
@@ -329,3 +330,46 @@ def deactivate_user(
     user.is_active = False
     db.commit()
 
+
+
+@router.patch("/tickets/{ticket_id}/entries")
+def update_ticket_entries(
+    ticket_id: int,
+    remaining_entries: int,
+    db: Session = Depends(get_db),
+    admin=Depends(require_admin),
+):
+    ticket = db.query(Ticket).get(ticket_id)
+    if not ticket:
+        raise HTTPException(404, "Ticket not found")
+
+    if remaining_entries < 0:
+        raise HTTPException(400, "remaining_entries cannot be negative")
+
+    ticket.remaining_entries = remaining_entries
+    ticket.is_active = remaining_entries > 0 or ticket.remaining_entries is None
+
+    db.commit()
+    return {"status": "updated"}
+
+
+
+@router.patch("/tickets/{ticket_id}/validity")
+def update_ticket_validity(
+    ticket_id: int,
+    valid_until: datetime,
+    db: Session = Depends(get_db),
+    admin=Depends(require_admin),
+):
+    ticket = db.query(Ticket).get(ticket_id)
+    if not ticket:
+        raise HTTPException(404, "Ticket not found")
+
+    if valid_until <= ticket.valid_from:
+        raise HTTPException(400, "valid_until must be after valid_from")
+
+    ticket.valid_until = valid_until
+    ticket.is_active = valid_until >= datetime.now(UTC)
+
+    db.commit()
+    return {"status": "validity updated"}
