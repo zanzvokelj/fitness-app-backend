@@ -137,13 +137,13 @@ def view_bookings(
         .join(TrainingSession)
     )
 
-    if session_id:
+    if session_id is not None:
         query = query.filter(Booking.session_id == session_id)
 
-    if center_id:
+    if center_id is not None:
         query = query.filter(TrainingSession.center_id == center_id)
 
-    if day:
+    if day is not None:
         start = datetime(day.year, day.month, day.day, tzinfo=UTC)
         end = start + timedelta(days=1)
 
