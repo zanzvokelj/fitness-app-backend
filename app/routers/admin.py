@@ -165,10 +165,10 @@ def list_sessions(
 ):
     query = db.query(TrainingSession).join(ClassType)
 
-    if center_id:
+    if center_id is not None:
         query = query.filter(TrainingSession.center_id == center_id)
 
-    if day:
+    if day is not None:
         start = datetime(day.year, day.month, day.day, tzinfo=UTC)
         end = start + timedelta(days=1)
         query = query.filter(
