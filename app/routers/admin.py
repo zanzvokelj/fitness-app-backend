@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from datetime import datetime, timedelta, date, UTC
-
+from sqlalchemy.orm import selectinload
 from app.db import get_db
 from app.core.dependencies import require_admin
 from app.models.session import Session as TrainingSession
@@ -120,7 +120,6 @@ def cancel_session(
 
     return session
 
-
 @router.get("/bookings", response_model=list[AdminBookingOut])
 def view_bookings(
     session_id: int | None = None,
@@ -129,7 +128,14 @@ def view_bookings(
     db: Session = Depends(get_db),
     admin=Depends(require_admin),
 ):
-    query = db.query(Booking).join(TrainingSession)
+    query = (
+        db.query(Booking)
+        .options(
+            selectinload(Booking.user),
+            selectinload(Booking.session).selectinload(TrainingSession.class_type),
+        )
+        .join(TrainingSession)
+    )
 
     if session_id:
         query = query.filter(Booking.session_id == session_id)
