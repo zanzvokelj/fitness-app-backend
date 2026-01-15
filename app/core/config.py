@@ -9,6 +9,7 @@ class Settings(BaseSettings):
 
     # Frontend
     FRONTEND_URL: str = Field(..., env="FRONTEND_URL")
+    DEFAULT_LOCALE: str = Field("si", env="DEFAULT_LOCALE")
 
     # Security
     SECRET_KEY: str = Field(..., env="SECRET_KEY")

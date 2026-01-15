@@ -51,7 +51,7 @@ def create_checkout(
             },
             "quantity": 1,
         }],
-        success_url=settings.FRONTEND_URL + f"/success?order_id={order.id}",
+        success_url=settings.FRONTEND_URL + f"/{settings.DEFAULT_LOCALE}/success?order_id={order.id}",
         cancel_url=settings.FRONTEND_URL + "/cancel",
         metadata={"order_id": str(order.id)},
     )
