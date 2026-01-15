@@ -14,13 +14,35 @@ class BookingOut(BaseModel):
     class Config:
         from_attributes = True
 
+class AdminBookingUserOut(BaseModel):
+    email: str
+
+    class Config:
+        from_attributes = True
+
+
+class AdminBookingSessionClassTypeOut(BaseModel):
+    name: str
+
+    class Config:
+        from_attributes = True
+
+
+class AdminBookingSessionOut(BaseModel):
+    start_time: datetime
+    class_type: AdminBookingSessionClassTypeOut
+
+    class Config:
+        from_attributes = True
+
+
 class AdminBookingOut(BaseModel):
     id: int
     status: str
     created_at: datetime
 
-    user_id: int
-    session_id: int
+    user: AdminBookingUserOut
+    session: AdminBookingSessionOut
 
     class Config:
         from_attributes = True
