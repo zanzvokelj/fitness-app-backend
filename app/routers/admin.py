@@ -125,6 +125,8 @@ def view_bookings(
     session_id: int | None = None,
     center_id: int | None = None,
     day: date | None = None,
+    status: str | None = None,
+    email: str | None = None,
     db: Session = Depends(get_db),
     admin=Depends(require_admin),
 ):
@@ -135,6 +137,7 @@ def view_bookings(
             selectinload(Booking.session).selectinload(TrainingSession.class_type),
         )
         .join(TrainingSession)
+        .join(User)
     )
 
     if session_id is not None:
@@ -143,17 +146,21 @@ def view_bookings(
     if center_id is not None:
         query = query.filter(TrainingSession.center_id == center_id)
 
+    if status is not None:
+        query = query.filter(Booking.status == status)
+
+    if email is not None:
+        query = query.filter(User.email.ilike(f"%{email}%"))
+
     if day is not None:
         start = datetime(day.year, day.month, day.day, tzinfo=UTC)
         end = start + timedelta(days=1)
-
         query = query.filter(
             TrainingSession.start_time >= start,
             TrainingSession.start_time < end,
         )
 
     return query.order_by(Booking.created_at.desc()).all()
-
 
 
 @router.get("/sessions", response_model=list[SessionOut])
