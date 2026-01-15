@@ -1,0 +1,14 @@
+# Environment variables
+.env
+.env.*
+*.env
+
+# Python
+__pycache__/
+*.pyc
+
+# Alembic cache
+alembic/versions/__pycache__/
+
+# OS
+.DS_Store
