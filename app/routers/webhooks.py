@@ -33,54 +33,79 @@ async def stripe_webhook(
     except stripe.error.SignatureVerificationError:
         raise HTTPException(status_code=400, detail="Invalid signature")
 
-    if event["type"] == "checkout.session.completed":
-        session = event["data"]["object"]
+    if event["type"] != "checkout.session.completed":
+        return {"status": "ignored"}
 
-        order_id = int(session["metadata"]["order_id"])
-        order = db.query(Order).get(order_id)
+    session = event["data"]["object"]
+    order_id = int(session["metadata"]["order_id"])
 
-        if not order:
-            raise HTTPException(404, "Order not found")
+    order = db.query(Order).get(order_id)
+    if not order:
+        raise HTTPException(404, "Order not found")
 
-        # 🔒 idempotency
-        existing_payment = db.query(Payment).filter(
-            Payment.order_id == order.id
-        ).first()
-        if existing_payment:
-            return {"status": "already processed"}
+    # 🔒 IDEMPOTENCY
+    existing_payment = (
+        db.query(Payment)
+        .filter(Payment.order_id == order.id)
+        .first()
+    )
+    if existing_payment:
+        return {"status": "already processed"}
 
-        order.status = "paid"
+    order.status = "paid"
 
-        payment = Payment(
-            order_id=order.id,
-            provider="stripe",
-            provider_reference=session["id"],
-            status="succeeded",
+    payment = Payment(
+        order_id=order.id,
+        provider="stripe",
+        provider_reference=session["id"],
+        status="succeeded",
+    )
+    db.add(payment)
+
+    plan = db.query(TicketPlan).get(order.ticket_plan_id)
+    if not plan:
+        raise HTTPException(500, "Ticket plan missing")
+
+    now = datetime.now(UTC)
+
+    valid_until = (
+        now + timedelta(days=plan.duration_days)
+        if plan.duration_days
+        else now.replace(year=now.year + 10)
+    )
+
+    # 🎟️ ENTRY-BASED PLAN → ACCUMULATE
+    if plan.max_entries is not None:
+        existing_ticket = (
+            db.query(Ticket)
+            .filter(
+                Ticket.user_id == order.user_id,
+                Ticket.plan_id == plan.id,
+                Ticket.is_active.is_(True),
+                Ticket.remaining_entries.isnot(None),
+            )
+            .order_by(Ticket.created_at.desc())
+            .first()
         )
-        db.add(payment)
 
-        plan = db.query(TicketPlan).get(order.ticket_plan_id)
-        if not plan:
-            raise HTTPException(500, "Ticket plan missing")
+        if existing_ticket:
+            existing_ticket.remaining_entries += plan.max_entries
+            existing_ticket.is_active = True
+            db.commit()
+            return {"status": "entries accumulated"}
 
-        now = datetime.now(UTC)
-        valid_until = (
-            now + timedelta(days=plan.duration_days)
-            if plan.duration_days
-            else now.replace(year=now.year + 10)
-        )
+    # 🆕 CREATE NEW TICKET
+    ticket = Ticket(
+        user_id=order.user_id,
+        center_id=1,  # TODO: future multi-center logic
+        plan_id=plan.id,
+        valid_from=now,
+        valid_until=valid_until,
+        remaining_entries=plan.max_entries,
+        is_active=True,
+    )
 
-        ticket = Ticket(
-            user_id=order.user_id,
-            center_id=1,  # OK za zdaj
-            plan_id=plan.id,
-            valid_from=now,
-            valid_until=valid_until,
-            remaining_entries=plan.max_entries,
-            is_active=True,
-        )
+    db.add(ticket)
+    db.commit()
 
-        db.add(ticket)
-        db.commit()
-
-    return {"status": "ok"}
+    return {"status": "ticket created"}
