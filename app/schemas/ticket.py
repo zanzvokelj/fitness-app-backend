@@ -8,6 +8,7 @@ class TicketOut(BaseModel):
     valid_from: datetime
     valid_until: datetime
     is_active: bool
+    remaining_entries: int | None
     plan: TicketPlanOut
 
     class Config:
@@ -19,6 +20,7 @@ class AdminTicketOut(BaseModel):
     center_id: int
     valid_from: datetime
     valid_until: datetime
+    remaining_entries: int | None
     is_active: bool
 
     plan: TicketPlanOut
