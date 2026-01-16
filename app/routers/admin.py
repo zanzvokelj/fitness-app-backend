@@ -26,6 +26,10 @@ router = APIRouter(
 )
 
 
+@router.get("/me")
+def admin_me(admin=Depends(require_admin)):
+    return {"is_admin": True}
+
 @router.post("/sessions", response_model=SessionOut)
 def create_session(
     data: SessionCreate,
