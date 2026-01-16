@@ -23,16 +23,16 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 # ---------- JWT ----------
 def create_access_token(
-    *,
     subject: str,
     role: str,
     expires_delta: Optional[timedelta] = None,
 ) -> str:
-    expire = datetime.now(UTC) + (
-        expires_delta
-        if expires_delta
-        else timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    )
+    if expires_delta:
+        expire = datetime.now(UTC) + expires_delta
+    else:
+        expire = datetime.now(UTC) + timedelta(
+            minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
+        )
 
     to_encode = {
         "sub": subject,

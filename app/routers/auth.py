@@ -34,7 +34,7 @@ def login(
     if not user or not verify_password(form_data.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Incorrect email or password")
 
-    access_token = create_access_token(subject=user.email)
+    access_token = create_access_token(subject=user.email,role=user.role)
 
     refresh_token_value = create_refresh_token()
 
@@ -124,8 +124,10 @@ def refresh_access_token(
     db.add(new_refresh)
 
     # 3) create new access token
-    access_token = create_access_token(subject=token_db.user.email)
-
+    access_token = create_access_token(
+        subject=token_db.user.email,
+        role=token_db.user.role,
+    )
     db.commit()
 
     return {
