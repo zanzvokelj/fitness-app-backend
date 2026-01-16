@@ -541,7 +541,7 @@ def admin_stats(
 
     total_users = db.query(func.count(User.id)).scalar()
 
-    users_by_day = (
+    users_by_day_raw = (
         db.query(
             func.date(User.created_at).label("day"),
             func.count(User.id).label("count"),
@@ -550,6 +550,11 @@ def admin_stats(
         .order_by("day")
         .all()
     )
+
+    users_by_day = [
+        {"day": day.isoformat(), "count": count}
+        for day, count in users_by_day_raw
+    ]
 
     active_tickets = (
         db.query(func.count(Ticket.id))
@@ -566,7 +571,7 @@ def admin_stats(
         .scalar()
     )
 
-    bookings_by_weekday = (
+    bookings_by_weekday_raw = (
         db.query(
             func.extract("dow", TrainingSession.start_time).label("weekday"),
             func.count(Booking.id).label("count"),
@@ -579,6 +584,11 @@ def admin_stats(
         .all()
     )
 
+    bookings_by_weekday = [
+        {"weekday": int(weekday), "count": count}
+        for weekday, count in bookings_by_weekday_raw
+    ]
+
     revenue_this_month = (
         db.query(func.coalesce(func.sum(TicketPlan.price_cents), 0))
         .select_from(Ticket)
@@ -587,7 +597,7 @@ def admin_stats(
         .scalar()
     )
 
-    revenue_by_day = (
+    revenue_by_day_raw = (
         db.query(
             func.date(Ticket.created_at).label("day"),
             func.sum(TicketPlan.price_cents).label("revenue"),
@@ -599,7 +609,12 @@ def admin_stats(
         .all()
     )
 
-    popular_classes = (
+    revenue_by_day = [
+        {"day": day.isoformat(), "revenue": revenue / 100}
+        for day, revenue in revenue_by_day_raw
+    ]
+
+    popular_classes_raw = (
         db.query(
             ClassType.name,
             func.count(Booking.id).label("count"),
@@ -612,6 +627,11 @@ def admin_stats(
         .limit(5)
         .all()
     )
+
+    popular_classes = [
+        {"name": name, "count": count}
+        for name, count in popular_classes_raw
+    ]
 
     return {
         "kpis": {
