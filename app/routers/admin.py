@@ -201,25 +201,39 @@ def list_users(
 
 
 @router.get("/tickets", response_model=list[AdminTicketOut])
-def list_active_tickets(
+def list_tickets(
+    email: str | None = None,
+    plan_id: int | None = None,
+    status: str | None = None,
+    from_date: date | None = None,
+    to_date: date | None = None,
     db: Session = Depends(get_db),
     admin=Depends(require_admin),
 ):
-    now = datetime.now(UTC)
-
-    return (
+    query = (
         db.query(Ticket)
-        .options(
-            selectinload(Ticket.user),
-            selectinload(Ticket.plan),
-        )
-        .filter(
-            Ticket.valid_until >= now,
-        )
-        .order_by(Ticket.created_at.desc())
-        .all()
+        .join(User)
+        .options(selectinload(Ticket.plan), selectinload(Ticket.user))
     )
 
+    if email:
+        query = query.filter(User.email.ilike(f"%{email}%"))
+
+    if plan_id:
+        query = query.filter(Ticket.plan_id == plan_id)
+
+    if status == "active":
+        query = query.filter(Ticket.is_active.is_(True))
+    elif status == "inactive":
+        query = query.filter(Ticket.is_active.is_(False))
+
+    if from_date:
+        query = query.filter(Ticket.valid_from >= from_date)
+
+    if to_date:
+        query = query.filter(Ticket.valid_from <= to_date)
+
+    return query.order_by(Ticket.created_at.desc()).all()
 
 @router.post("/tickets/assign")
 def assign_ticket(
