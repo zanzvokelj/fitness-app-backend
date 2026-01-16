@@ -1,15 +1,14 @@
 import stripe
-from fastapi import APIRouter, Request, Header, HTTPException
+from fastapi import APIRouter, Request, Header, HTTPException, Depends
 from sqlalchemy.orm import Session
+from datetime import datetime, UTC, timedelta
 
 from app.core.config import settings
 from app.db import get_db
-from fastapi import Depends
 from app.models.order import Order
 from app.models.payment import Payment
 from app.models.ticket import Ticket
 from app.models.ticket_plan import TicketPlan
-from datetime import datetime, UTC, timedelta
 
 router = APIRouter(prefix="/api/v1/webhooks", tags=["webhooks"])
 
@@ -37,11 +36,15 @@ async def stripe_webhook(
         return {"status": "ignored"}
 
     session = event["data"]["object"]
+
+    if session.get("payment_status") != "paid":
+        return {"status": "not paid"}
+
     order_id = int(session["metadata"]["order_id"])
 
-    order = db.query(Order).get(order_id)
+    order = db.get(Order, order_id)
     if not order:
-        raise HTTPException(404, "Order not found")
+        return {"status": "order not found"}
 
     # 🔒 IDEMPOTENCY
     existing_payment = (
@@ -62,9 +65,9 @@ async def stripe_webhook(
     )
     db.add(payment)
 
-    plan = db.query(TicketPlan).get(order.ticket_plan_id)
+    plan = db.get(TicketPlan, order.ticket_plan_id)
     if not plan:
-        raise HTTPException(500, "Ticket plan missing")
+        return {"status": "plan missing"}
 
     now = datetime.now(UTC)
 
@@ -80,7 +83,7 @@ async def stripe_webhook(
             db.query(Ticket)
             .filter(
                 Ticket.user_id == order.user_id,
-                Ticket.center_id == 1,
+                Ticket.center_id == 1,  # TODO multi-center
                 Ticket.is_active.is_(True),
                 Ticket.remaining_entries.isnot(None),
                 Ticket.valid_until >= now,
@@ -101,7 +104,7 @@ async def stripe_webhook(
     # 🆕 CREATE NEW TICKET
     ticket = Ticket(
         user_id=order.user_id,
-        center_id=1,  # TODO: future multi-center logic
+        center_id=1,
         plan_id=plan.id,
         valid_from=now,
         valid_until=valid_until,
