@@ -195,16 +195,35 @@ def list_sessions(
 
 @router.get("/users", response_model=list[AdminUserOut])
 def list_users(
+    has_valid_ticket: bool | None = None,
     db: Session = Depends(get_db),
     admin=Depends(require_admin),
 ):
-    return (
-        db.query(User)
-        .order_by(User.created_at.desc())
-        .all()
-    )
+    now = datetime.now(UTC)
 
+    query = db.query(User)
 
+    if has_valid_ticket is not None:
+        valid_ticket_subquery = (
+            db.query(Ticket.user_id)
+            .filter(
+                Ticket.is_active.is_(True),
+                Ticket.valid_from <= now,
+                Ticket.valid_until >= now,
+                or_(
+                    Ticket.remaining_entries.is_(None),
+                    Ticket.remaining_entries > 0,
+                ),
+            )
+            .subquery()
+        )
+
+        if has_valid_ticket:
+            query = query.filter(User.id.in_(valid_ticket_subquery))
+        else:
+            query = query.filter(~User.id.in_(valid_ticket_subquery))
+
+    return query.order_by(User.created_at.desc()).all()
 
 @router.get("/tickets", response_model=list[AdminTicketOut])
 def list_tickets(
