@@ -7,6 +7,7 @@ from fastapi.security import OAuth2PasswordBearer
 
 from app.core.config import settings
 
+
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -22,18 +23,20 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 # ---------- JWT ----------
 def create_access_token(
+    *,
     subject: str,
+    role: str,
     expires_delta: Optional[timedelta] = None,
 ) -> str:
-    if expires_delta:
-        expire = datetime.now(UTC) + expires_delta
-    else:
-        expire = datetime.now(UTC) + timedelta(
-            minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
-        )
+    expire = datetime.now(UTC) + (
+        expires_delta
+        if expires_delta
+        else timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    )
 
     to_encode = {
         "sub": subject,
+        "role": role,
         "exp": expire,
     }
 
