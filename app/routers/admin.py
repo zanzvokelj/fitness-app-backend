@@ -539,7 +539,6 @@ def admin_stats(
     now = datetime.now(UTC)
     start_month = now.replace(day=1)
 
-    # USERS
     total_users = db.query(func.count(User.id)).scalar()
 
     users_by_day = (
@@ -552,7 +551,6 @@ def admin_stats(
         .all()
     )
 
-    # TICKETS
     active_tickets = (
         db.query(func.count(Ticket.id))
         .filter(
@@ -562,7 +560,6 @@ def admin_stats(
         .scalar()
     )
 
-    # BOOKINGS
     total_bookings = (
         db.query(func.count(Booking.id))
         .filter(Booking.status == "active")
@@ -574,17 +571,18 @@ def admin_stats(
             func.extract("dow", TrainingSession.start_time).label("weekday"),
             func.count(Booking.id).label("count"),
         )
-        .join(TrainingSession)
+        .select_from(Booking)
+        .join(TrainingSession, Booking.session_id == TrainingSession.id)
         .filter(Booking.status == "active")
         .group_by("weekday")
         .order_by("weekday")
         .all()
     )
 
-    # REVENUE (from tickets)
     revenue_this_month = (
         db.query(func.coalesce(func.sum(TicketPlan.price_cents), 0))
-        .join(Ticket)
+        .select_from(Ticket)
+        .join(TicketPlan, Ticket.plan_id == TicketPlan.id)
         .filter(Ticket.created_at >= start_month)
         .scalar()
     )
@@ -594,20 +592,21 @@ def admin_stats(
             func.date(Ticket.created_at).label("day"),
             func.sum(TicketPlan.price_cents).label("revenue"),
         )
-        .join(TicketPlan)
+        .select_from(Ticket)
+        .join(TicketPlan, Ticket.plan_id == TicketPlan.id)
         .group_by(func.date(Ticket.created_at))
         .order_by("day")
         .all()
     )
 
-    # POPULAR CLASSES
     popular_classes = (
         db.query(
             ClassType.name,
             func.count(Booking.id).label("count"),
         )
-        .join(TrainingSession)
-        .join(Booking)
+        .select_from(Booking)
+        .join(TrainingSession, Booking.session_id == TrainingSession.id)
+        .join(ClassType, TrainingSession.class_type_id == ClassType.id)
         .group_by(ClassType.name)
         .order_by(func.count(Booking.id).desc())
         .limit(5)
