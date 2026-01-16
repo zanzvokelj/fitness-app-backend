@@ -17,7 +17,9 @@ from app.models.ticket import Ticket
 from app.schemas.ticket import AdminTicketOut
 from app.schemas.ticket import AdminAssignTicket
 from app.models.ticket_plan import TicketPlan
-
+from app.models.center import Center
+from app.schemas.center import CenterCreate, CenterOut
+from app.schemas.class_type import ClassTypeCreate, ClassTypeOut
 router = APIRouter(
     prefix="/api/v1/admin",
     tags=["admin"],
@@ -390,3 +392,115 @@ def update_ticket_validity(
 
     db.commit()
     return {"status": "validity updated"}
+
+
+
+@router.get("/centers", response_model=list[CenterOut])
+def list_centers(
+    db: Session = Depends(get_db),
+    admin=Depends(require_admin),
+):
+    return db.query(Center).order_by(Center.name).all()
+
+
+@router.post("/centers", response_model=CenterOut)
+def create_center(
+    data: CenterCreate,
+    db: Session = Depends(get_db),
+    admin=Depends(require_admin),
+):
+    center = Center(name=data.name, is_active=True)
+    db.add(center)
+    db.commit()
+    db.refresh(center)
+    return center
+
+
+@router.patch("/centers/{center_id}", response_model=CenterOut)
+def update_center(
+    center_id: int,
+    data: CenterCreate,
+    db: Session = Depends(get_db),
+    admin=Depends(require_admin),
+):
+    center = db.query(Center).get(center_id)
+    if not center:
+        raise HTTPException(404, "Center not found")
+
+    center.name = data.name
+    db.commit()
+    db.refresh(center)
+    return center
+
+
+@router.patch("/centers/{center_id}/deactivate")
+def deactivate_center(
+    center_id: int,
+    db: Session = Depends(get_db),
+    admin=Depends(require_admin),
+):
+    center = db.query(Center).get(center_id)
+    if not center:
+        raise HTTPException(404, "Center not found")
+
+    center.is_active = False
+    db.commit()
+    return {"status": "deactivated"}
+
+
+
+
+
+@router.get("/class-types", response_model=list[ClassTypeOut])
+def list_class_types(
+    db: Session = Depends(get_db),
+    admin=Depends(require_admin),
+):
+    return db.query(ClassType).order_by(ClassType.name).all()
+
+
+@router.post("/class-types", response_model=ClassTypeOut)
+def create_class_type(
+    data: ClassTypeCreate,
+    db: Session = Depends(get_db),
+    admin=Depends(require_admin),
+):
+    ct = ClassType(
+        name=data.name,
+        duration=data.duration,
+        is_active=True,
+    )
+    db.add(ct)
+    db.commit()
+    db.refresh(ct)
+    return ct
+
+
+@router.patch("/class-types/{class_type_id}", response_model=ClassTypeOut)
+def update_class_type(
+    class_type_id: int,
+    data: ClassTypeCreate,
+    db: Session = Depends(get_db),
+    admin=Depends(require_admin),
+):
+    ct = db.query(ClassType).get(class_type_id)
+    if not ct:
+        raise HTTPException(404, "Class type not found")
+
+    ct.name = data.name
+    ct.duration = data.duration
+    db.commit()
+    db.refresh(ct)
+    return ct
+
+
+@router.patch("/class-types/{class_type_id}/deactivate")
+def deactivate_class_type(
+    class_type_id: int,
+    db: Session = Depends(get_db),
+    admin=Depends(require_admin),
+):
+    ct = db.query(ClassType).get(class_type_id)
+    ct.is_active = False
+    db.commit()
+    return {"status": "deactivated"}
