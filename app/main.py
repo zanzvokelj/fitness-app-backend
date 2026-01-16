@@ -9,6 +9,13 @@ from app.routers import ticket_plans
 from app.routers import webhooks
 from app.core.config import settings
 app = FastAPI(title="Group Fitness Booking API")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[settings.FRONTEND_URL],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 app.include_router(auth.router)
 app.include_router(users.router)
@@ -29,13 +36,6 @@ app.include_router(webhooks.router)
 
 app.include_router(orders.router)
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[settings.FRONTEND_URL],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 @app.get("/health")
 def health_check():
