@@ -527,3 +527,102 @@ def deactivate_class_type(
     ct.is_active = False
     db.commit()
     return {"status": "deactivated"}
+
+
+
+
+@router.get("/stats")
+def admin_stats(
+    db: Session = Depends(get_db),
+    admin=Depends(require_admin),
+):
+    now = datetime.now(UTC)
+    start_month = now.replace(day=1)
+
+    # USERS
+    total_users = db.query(func.count(User.id)).scalar()
+
+    users_by_day = (
+        db.query(
+            func.date(User.created_at).label("day"),
+            func.count(User.id).label("count"),
+        )
+        .group_by(func.date(User.created_at))
+        .order_by("day")
+        .all()
+    )
+
+    # TICKETS
+    active_tickets = (
+        db.query(func.count(Ticket.id))
+        .filter(
+            Ticket.is_active.is_(True),
+            Ticket.valid_until >= now,
+        )
+        .scalar()
+    )
+
+    # BOOKINGS
+    total_bookings = (
+        db.query(func.count(Booking.id))
+        .filter(Booking.status == "active")
+        .scalar()
+    )
+
+    bookings_by_weekday = (
+        db.query(
+            func.extract("dow", TrainingSession.start_time).label("weekday"),
+            func.count(Booking.id).label("count"),
+        )
+        .join(TrainingSession)
+        .filter(Booking.status == "active")
+        .group_by("weekday")
+        .order_by("weekday")
+        .all()
+    )
+
+    # REVENUE (from tickets)
+    revenue_this_month = (
+        db.query(func.coalesce(func.sum(TicketPlan.price_cents), 0))
+        .join(Ticket)
+        .filter(Ticket.created_at >= start_month)
+        .scalar()
+    )
+
+    revenue_by_day = (
+        db.query(
+            func.date(Ticket.created_at).label("day"),
+            func.sum(TicketPlan.price_cents).label("revenue"),
+        )
+        .join(TicketPlan)
+        .group_by(func.date(Ticket.created_at))
+        .order_by("day")
+        .all()
+    )
+
+    # POPULAR CLASSES
+    popular_classes = (
+        db.query(
+            ClassType.name,
+            func.count(Booking.id).label("count"),
+        )
+        .join(TrainingSession)
+        .join(Booking)
+        .group_by(ClassType.name)
+        .order_by(func.count(Booking.id).desc())
+        .limit(5)
+        .all()
+    )
+
+    return {
+        "kpis": {
+            "users": total_users,
+            "active_tickets": active_tickets,
+            "bookings": total_bookings,
+            "revenue": revenue_this_month / 100,
+        },
+        "users_by_day": users_by_day,
+        "revenue_by_day": revenue_by_day,
+        "bookings_by_weekday": bookings_by_weekday,
+        "popular_classes": popular_classes,
+    }
