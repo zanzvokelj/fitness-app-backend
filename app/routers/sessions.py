@@ -20,39 +20,49 @@ def list_sessions(
     day: date | None = None,
     db: DBSession = Depends(get_db),
 ):
-    query = (
+    # 🔹 subquery za booked_count
+    booked_count_subq = (
         db.query(
-            Session,
+            Booking.session_id,
             func.count(Booking.id).label("booked_count"),
         )
+        .filter(Booking.status == "active")
+        .group_by(Booking.session_id)
+        .subquery()
+    )
+
+    query = (
+        db.query(Session)
         .outerjoin(
-            Booking,
-            (Booking.session_id == Session.id)
-            & (Booking.status == "active")
+            booked_count_subq,
+            Session.id == booked_count_subq.c.session_id,
         )
         .options(joinedload(Session.class_type))
         .filter(Session.is_active.is_(True))
-        .group_by(Session.id)
     )
 
     if center_id:
         query = query.filter(Session.center_id == center_id)
 
     if day:
-        start = datetime.combine(day, datetime.min.time(), tzinfo=UTC)
+        start = datetime.combine(day, datetime.min.time())
         end = start + timedelta(days=1)
         query = query.filter(
             Session.start_time >= start,
             Session.start_time < end,
         )
 
-    results = query.order_by(Session.start_time).all()
+    sessions = query.order_by(Session.start_time).all()
 
-    # SQLAlchemy vrne (Session, booked_count) → pretvorimo
-    return [
-        {
-            **session.__dict__,
-            "booked_count": booked_count,
-        }
-        for session, booked_count in results
-    ]
+    # 🔹 ročno pripnemo booked_count (ker je subquery)
+    for s in sessions:
+        s.booked_count = (
+            db.query(func.count(Booking.id))
+            .filter(
+                Booking.session_id == s.id,
+                Booking.status == "active",
+            )
+            .scalar()
+        )
+
+    return sessions
