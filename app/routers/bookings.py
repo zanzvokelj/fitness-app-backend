@@ -98,17 +98,13 @@ def create_booking(
     return booking
 
 @router.delete("/{booking_id}", status_code=200)
-def cancel_booking(
-    booking_id: int,
-    db: DBSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
+def cancel_booking(booking_id: int, db: DBSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     booking = (
         db.query(Booking)
         .filter(
             Booking.id == booking_id,
             Booking.user_id == current_user.id,
-            Booking.status == "active",
+            Booking.status.in_(["active", "waiting"]),
         )
         .with_for_update()
         .first()
