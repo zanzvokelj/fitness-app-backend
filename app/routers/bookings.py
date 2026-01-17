@@ -97,7 +97,7 @@ def create_booking(
 
     return booking
 
-@router.delete("{booking_id}", status_code=200)
+@router.delete("/{booking_id}", status_code=200)
 def cancel_booking(
     booking_id: int,
     db: DBSession = Depends(get_db),
