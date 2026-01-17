@@ -89,7 +89,7 @@ def cancel_booking(
         .filter(
             Booking.id == booking_id,
             Booking.user_id == current_user.id,
-            Booking.status == (["active", "waiting"]),
+            Booking.status.in_(["active", "waiting"]),
         )
         .with_for_update()
         .first()
