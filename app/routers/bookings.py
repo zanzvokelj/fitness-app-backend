@@ -36,14 +36,14 @@ def create_booking(
     if not session:
         raise HTTPException(status_code=404, detail="Session not available")
 
-    # 🎟️ Validate active ticket for this session/center
+    # 🎟️ Validate active ticket
     ticket = require_active_ticket_for_session(
         session=session,
         current_user=current_user,
         db=db,
     )
 
-    # ⏳ WAITING LIST (NO ENTRY CONSUMPTION)
+    # ⏳ WAITING LIST
     if session.booked_count >= session.capacity:
         booking = Booking(
             user_id=current_user.id,
@@ -55,7 +55,7 @@ def create_booking(
         db.refresh(booking)
         return booking
 
-    # ACTIVE BOOKING
+    # ✅ ACTIVE BOOKING
     booking = Booking(
         user_id=current_user.id,
         session_id=session_id,
@@ -65,7 +65,6 @@ def create_booking(
     db.add(booking)
     session.booked_count += 1
 
-    # 🎟️ CONSUME ENTRY (only for limited plans)
     if ticket.remaining_entries is not None:
         ticket.remaining_entries -= 1
         if ticket.remaining_entries <= 0:
@@ -76,25 +75,30 @@ def create_booking(
     except IntegrityError:
         raise HTTPException(status_code=400, detail="Already booked")
 
+
+    user_email = current_user.email
+    class_name = session.class_type.name
+    center_name = session.center.name
+    start_time_str = session.start_time.strftime("%d.%m.%Y %H:%M")
+
     db.commit()
     db.refresh(booking)
-    # 📧 SEND CONFIRMATION EMAIL
-    html = render_template(
-        "booking_confirmation.html",
-        user_email=current_user.email,
-        class_name=session.class_type.name,
-        start_time=session.start_time.strftime("%d.%m.%Y %H:%M"),
-        center_name=session.center.name,
-    )
 
+    # 📧 EMAIL (side-effect)
     try:
+        html = render_template(
+            "booking_confirmation.html",
+            user_email=user_email,
+            class_name=class_name,
+            center_name=center_name,
+            start_time=start_time_str,
+        )
         send_email(
-            to_email=current_user.email,
+            to_email=user_email,
             subject="Booking confirmed",
             html_body=html,
         )
     except Exception as e:
-        # NEVER break booking flow because of email
         print("Booking confirmation email failed:", e)
 
     return booking
@@ -144,7 +148,7 @@ def cancel_booking(
         ticket.remaining_entries += 1
         ticket.is_active = True
 
-    # 3️⃣ Promote first waiting user (FIFO)
+    # ⏫ Promote waiting user
     next_waiting = (
         db.query(Booking)
         .filter(
@@ -160,17 +164,22 @@ def cancel_booking(
         next_waiting.status = "active"
         session.booked_count += 1
 
+
+    user_email = current_user.email
+    class_name = session.class_type.name
+    start_time_str = session.start_time.strftime("%d.%m.%Y %H:%M")
+
     db.commit()
 
-    html = render_template(
-        "booking_cancelled.html",
-        class_name=session.class_type.name,
-        start_time=session.start_time.strftime("%d.%m.%Y %H:%M"),
-    )
-
+    # 📧 EMAIL (side-effect)
     try:
+        html = render_template(
+            "booking_cancelled.html",
+            class_name=class_name,
+            start_time=start_time_str,
+        )
         send_email(
-            to_email=current_user.email,
+            to_email=user_email,
             subject="Booking cancelled",
             html_body=html,
         )
