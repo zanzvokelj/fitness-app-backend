@@ -25,7 +25,6 @@ def create_booking(
     db: DBSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    # 🔒 Lock session row
     session = (
         db.query(Session)
         .filter(Session.id == session_id, Session.is_active.is_(True))
@@ -36,14 +35,12 @@ def create_booking(
     if not session:
         raise HTTPException(status_code=404, detail="Session not available")
 
-    # 🎟️ Validate active ticket
     ticket = require_active_ticket_for_session(
         session=session,
         current_user=current_user,
         db=db,
     )
 
-    # ⏳ WAITING LIST
     if session.booked_count >= session.capacity:
         booking = Booking(
             user_id=current_user.id,
@@ -55,7 +52,11 @@ def create_booking(
         db.refresh(booking)
         return booking
 
-    # ✅ ACTIVE BOOKING
+    # 🔹 ZGRABI PODATKE ZA EMAIL PRED COMMITOM
+    class_name = session.class_type.name
+    center_name = session.center.name
+    start_time_str = session.start_time.strftime("%d.%m.%Y %H:%M")
+
     booking = Booking(
         user_id=current_user.id,
         session_id=session_id,
@@ -75,26 +76,19 @@ def create_booking(
     except IntegrityError:
         raise HTTPException(status_code=400, detail="Already booked")
 
-
-    user_email = current_user.email
-    class_name = session.class_type.name
-    center_name = session.center.name
-    start_time_str = session.start_time.strftime("%d.%m.%Y %H:%M")
-
     db.commit()
     db.refresh(booking)
 
-    # 📧 EMAIL (side-effect)
+    # 📧 EMAIL (NE SME ZLOMITI FLOWA)
     try:
         html = render_template(
             "booking_confirmation.html",
-            user_email=user_email,
             class_name=class_name,
             center_name=center_name,
             start_time=start_time_str,
         )
         send_email(
-            to_email=user_email,
+            to_email=current_user.email,
             subject="Booking confirmed",
             html_body=html,
         )
@@ -130,6 +124,10 @@ def cancel_booking(
         .first()
     )
 
+    # 🔹 ZGRABI PODATKE ZA EMAIL PRED COMMITOM
+    class_name = session.class_type.name
+    start_time_str = session.start_time.strftime("%d.%m.%Y %H:%M")
+
     ticket = (
         db.query(Ticket)
         .filter(
@@ -148,7 +146,6 @@ def cancel_booking(
         ticket.remaining_entries += 1
         ticket.is_active = True
 
-    # ⏫ Promote waiting user
     next_waiting = (
         db.query(Booking)
         .filter(
@@ -164,14 +161,8 @@ def cancel_booking(
         next_waiting.status = "active"
         session.booked_count += 1
 
-
-    user_email = current_user.email
-    class_name = session.class_type.name
-    start_time_str = session.start_time.strftime("%d.%m.%Y %H:%M")
-
     db.commit()
 
-    # 📧 EMAIL (side-effect)
     try:
         html = render_template(
             "booking_cancelled.html",
@@ -179,7 +170,7 @@ def cancel_booking(
             start_time=start_time_str,
         )
         send_email(
-            to_email=user_email,
+            to_email=current_user.email,
             subject="Booking cancelled",
             html_body=html,
         )
