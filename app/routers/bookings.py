@@ -11,7 +11,7 @@ from app.models.user import User
 from app.models.ticket import Ticket
 from app.schemas.booking import BookingOut
 from app.core.dependencies import get_current_user
-
+from app.core.email import send_email, render_template
 
 router = APIRouter(
     prefix="/api/v1/bookings",
@@ -55,7 +55,7 @@ def create_booking(
         db.refresh(booking)
         return booking
 
-    # ✅ ACTIVE BOOKING
+    # ACTIVE BOOKING
     booking = Booking(
         user_id=current_user.id,
         session_id=session_id,
@@ -78,6 +78,25 @@ def create_booking(
 
     db.commit()
     db.refresh(booking)
+    # 📧 SEND CONFIRMATION EMAIL
+    html = render_template(
+        "booking_confirmation.html",
+        user_email=current_user.email,
+        class_name=session.class_type.name,
+        start_time=session.start_time.strftime("%d.%m.%Y %H:%M"),
+        center_name=session.center.name,
+    )
+
+    try:
+        send_email(
+            to_email=current_user.email,
+            subject="Booking confirmed",
+            html_body=html,
+        )
+    except Exception as e:
+        # NEVER break booking flow because of email
+        print("Booking confirmation email failed:", e)
+
     return booking
 
 @router.delete("/{booking_id}", status_code=200)
@@ -107,7 +126,6 @@ def cancel_booking(
         .first()
     )
 
-    # 🔍 Najdi ticket, ki je veljaven za ta center
     ticket = (
         db.query(Ticket)
         .filter(
@@ -119,14 +137,12 @@ def cancel_booking(
         .first()
     )
 
-    # 1️⃣ Cancel booking
     booking.status = "cancelled"
     session.booked_count -= 1
 
-    # 2️⃣ VRNI ENTRY (če gre za limited ticket)
     if ticket and ticket.remaining_entries is not None:
         ticket.remaining_entries += 1
-        ticket.is_active = True  # 🔑 reaktiviraj ticket
+        ticket.is_active = True
 
     # 3️⃣ Promote first waiting user (FIFO)
     next_waiting = (
@@ -143,10 +159,23 @@ def cancel_booking(
     if next_waiting:
         next_waiting.status = "active"
         session.booked_count += 1
-        # ⚠️ entry se NE porabi tukaj
-        # porabi se samo ob create_booking
 
     db.commit()
+
+    html = render_template(
+        "booking_cancelled.html",
+        class_name=session.class_type.name,
+        start_time=session.start_time.strftime("%d.%m.%Y %H:%M"),
+    )
+
+    try:
+        send_email(
+            to_email=current_user.email,
+            subject="Booking cancelled",
+            html_body=html,
+        )
+    except Exception as e:
+        print("Booking cancellation email failed:", e)
 
     return {"status": "cancelled"}
 
