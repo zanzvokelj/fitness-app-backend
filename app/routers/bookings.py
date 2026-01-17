@@ -11,20 +11,19 @@ from app.models.user import User
 from app.models.ticket import Ticket
 from app.schemas.booking import BookingOut
 from app.core.dependencies import get_current_user
-from app.core.email import send_email, render_template
 
 router = APIRouter(
     prefix="/api/v1/bookings",
     tags=["bookings"],
 )
 
-
-@router.post("", response_model=BookingOut, status_code=status.HTTP_201_CREATED)
+@router.post("/", response_model=BookingOut, status_code=status.HTTP_201_CREATED)
 def create_booking(
     session_id: int,
     db: DBSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    # 🔒 Lock session row
     session = (
         db.query(Session)
         .filter(Session.id == session_id, Session.is_active.is_(True))
@@ -35,12 +34,14 @@ def create_booking(
     if not session:
         raise HTTPException(status_code=404, detail="Session not available")
 
+    # 🎟️ Validate active ticket for this session/center
     ticket = require_active_ticket_for_session(
         session=session,
         current_user=current_user,
         db=db,
     )
 
+    # ⏳ WAITING LIST (NO ENTRY CONSUMPTION)
     if session.booked_count >= session.capacity:
         booking = Booking(
             user_id=current_user.id,
@@ -52,11 +53,7 @@ def create_booking(
         db.refresh(booking)
         return booking
 
-    # 🔹 ZGRABI PODATKE ZA EMAIL PRED COMMITOM
-    class_name = session.class_type.name
-    center_name = session.center.name
-    start_time_str = session.start_time.strftime("%d.%m.%Y %H:%M")
-
+    # ✅ ACTIVE BOOKING
     booking = Booking(
         user_id=current_user.id,
         session_id=session_id,
@@ -66,6 +63,7 @@ def create_booking(
     db.add(booking)
     session.booked_count += 1
 
+    # 🎟️ CONSUME ENTRY (only for limited plans)
     if ticket.remaining_entries is not None:
         ticket.remaining_entries -= 1
         if ticket.remaining_entries <= 0:
@@ -78,33 +76,20 @@ def create_booking(
 
     db.commit()
     db.refresh(booking)
-
-    # 📧 EMAIL (NE SME ZLOMITI FLOWA)
-    try:
-        html = render_template(
-            "booking_confirmation.html",
-            class_name=class_name,
-            center_name=center_name,
-            start_time=start_time_str,
-        )
-        send_email(
-            to_email=current_user.email,
-            subject="Booking confirmed",
-            html_body=html,
-        )
-    except Exception as e:
-        print("Booking confirmation email failed:", e)
-
     return booking
 
 @router.delete("/{booking_id}", status_code=200)
-def cancel_booking(booking_id: int, db: DBSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+def cancel_booking(
+    booking_id: int,
+    db: DBSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     booking = (
         db.query(Booking)
         .filter(
             Booking.id == booking_id,
             Booking.user_id == current_user.id,
-            Booking.status.in_(["active", "waiting"]),
+            Booking.status == "active",
         )
         .with_for_update()
         .first()
@@ -120,10 +105,7 @@ def cancel_booking(booking_id: int, db: DBSession = Depends(get_db), current_use
         .first()
     )
 
-    # 🔹 ZGRABI PODATKE ZA EMAIL PRED COMMITOM
-    class_name = session.class_type.name
-    start_time_str = session.start_time.strftime("%d.%m.%Y %H:%M")
-
+    # 🔍 Najdi ticket, ki je veljaven za ta center
     ticket = (
         db.query(Ticket)
         .filter(
@@ -135,13 +117,16 @@ def cancel_booking(booking_id: int, db: DBSession = Depends(get_db), current_use
         .first()
     )
 
+    # 1️⃣ Cancel booking
     booking.status = "cancelled"
     session.booked_count -= 1
 
+    # 2️⃣ VRNI ENTRY (če gre za limited ticket)
     if ticket and ticket.remaining_entries is not None:
         ticket.remaining_entries += 1
-        ticket.is_active = True
+        ticket.is_active = True  # 🔑 reaktiviraj ticket
 
+    # 3️⃣ Promote first waiting user (FIFO)
     next_waiting = (
         db.query(Booking)
         .filter(
@@ -156,25 +141,12 @@ def cancel_booking(booking_id: int, db: DBSession = Depends(get_db), current_use
     if next_waiting:
         next_waiting.status = "active"
         session.booked_count += 1
+        # ⚠️ entry se NE porabi tukaj
+        # porabi se samo ob create_booking
 
     db.commit()
 
-    try:
-        html = render_template(
-            "booking_cancelled.html",
-            class_name=class_name,
-            start_time=start_time_str,
-        )
-        send_email(
-            to_email=current_user.email,
-            subject="Booking cancelled",
-            html_body=html,
-        )
-    except Exception as e:
-        print("Booking cancellation email failed:", e)
-
     return {"status": "cancelled"}
-
 
 @router.get("/me", response_model=list[BookingOut])
 def my_bookings(
