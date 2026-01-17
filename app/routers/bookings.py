@@ -98,6 +98,8 @@ def cancel_booking(
     if not booking:
         raise HTTPException(status_code=404, detail="Booking not found")
 
+    was_active = booking.status == "active"
+
     session = (
         db.query(Session)
         .filter(Session.id == booking.session_id)
@@ -105,7 +107,6 @@ def cancel_booking(
         .first()
     )
 
-    # 🔍 Najdi ticket, ki je veljaven za ta center
     ticket = (
         db.query(Ticket)
         .filter(
@@ -117,37 +118,35 @@ def cancel_booking(
         .first()
     )
 
-    # 1️⃣ Cancel booking
+    # ❌ Cancel booking
     booking.status = "cancelled"
-    session.booked_count -= 1
 
-    # 2️⃣ VRNI ENTRY (če gre za limited ticket)
-    if ticket and ticket.remaining_entries is not None:
-        ticket.remaining_entries += 1
-        ticket.is_active = True  # 🔑 reaktiviraj ticket
+    # ✅ Samo če je bil ACTIVE
+    if was_active:
+        session.booked_count -= 1
 
-    # 3️⃣ Promote first waiting user (FIFO)
-    next_waiting = (
-        db.query(Booking)
-        .filter(
-            Booking.session_id == session.id,
-            Booking.status == "waiting",
+        if ticket and ticket.remaining_entries is not None:
+            ticket.remaining_entries += 1
+            ticket.is_active = True
+
+        # ⏫ Promote waiting user
+        next_waiting = (
+            db.query(Booking)
+            .filter(
+                Booking.session_id == session.id,
+                Booking.status == "waiting",
+            )
+            .order_by(Booking.created_at)
+            .with_for_update()
+            .first()
         )
-        .order_by(Booking.created_at)
-        .with_for_update()
-        .first()
-    )
 
-    if next_waiting:
-        next_waiting.status = "active"
-        session.booked_count += 1
-        # ⚠️ entry se NE porabi tukaj
-        # porabi se samo ob create_booking
+        if next_waiting:
+            next_waiting.status = "active"
+            session.booked_count += 1
 
     db.commit()
-
     return {"status": "cancelled"}
-
 @router.get("/me", response_model=list[BookingOut])
 def my_bookings(
     db: DBSession = Depends(get_db),
