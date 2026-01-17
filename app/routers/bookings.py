@@ -19,7 +19,7 @@ router = APIRouter(
 )
 
 
-@router.post("/", response_model=BookingOut, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=BookingOut, status_code=status.HTTP_201_CREATED)
 def create_booking(
     session_id: int,
     db: DBSession = Depends(get_db),
@@ -97,7 +97,7 @@ def create_booking(
 
     return booking
 
-@router.delete("/{booking_id}", status_code=200)
+@router.delete("{booking_id}", status_code=200)
 def cancel_booking(
     booking_id: int,
     db: DBSession = Depends(get_db),
