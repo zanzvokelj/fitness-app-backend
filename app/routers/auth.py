@@ -1,5 +1,5 @@
 from datetime import datetime, UTC
-
+from fastapi import Request
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
@@ -28,6 +28,7 @@ router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 @router.post("/login", response_model=Token)
 @limiter.limit("5/minute")
 def login(
+    request: Request,
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db),
 ):

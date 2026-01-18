@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session as DBSession
 from sqlalchemy.exc import IntegrityError
-
+from fastapi import Request
 from app.db import get_db
 from app.core.limiter import limiter
 from app.models.booking import Booking
@@ -27,6 +27,7 @@ router = APIRouter(
 @router.post("/", response_model=BookingOut, status_code=status.HTTP_201_CREATED)
 @limiter.limit("10/minute")
 def create_booking(
+    request: Request,
     session_id: int,
     db: DBSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
