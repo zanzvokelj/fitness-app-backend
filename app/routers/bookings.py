@@ -114,6 +114,7 @@ def create_booking(
 @router.delete("/{booking_id}", status_code=200)
 @limiter.limit("10/minute")
 def cancel_booking(
+    request: Request,
     booking_id: int,
     db: DBSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
