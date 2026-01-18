@@ -1,13 +1,9 @@
 from fastapi import APIRouter
-
 from app.core.email_resend import send_email
-from app.main import app
 
-router = APIRouter(tags=["debug"])
+router = APIRouter(prefix="/debug", tags=["debug"])
 
-
-
-@app.get("/test-email")
+@router.get("/test-email")
 def test_email():
     send_email(
         to_email="zan.fitness.app@gmail.com",
