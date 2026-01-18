@@ -1,23 +1,28 @@
-from datetime import datetime, UTC
-
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session as DBSession
 from sqlalchemy.exc import IntegrityError
-from app.core.dependencies import require_active_ticket, require_active_ticket_for_session
+
 from app.db import get_db
 from app.models.booking import Booking
 from app.models.session import Session
-from app.models.user import User
 from app.models.ticket import Ticket
+from app.models.user import User
 from app.schemas.booking import BookingOut
-from app.core.dependencies import get_current_user
+from app.core.dependencies import get_current_user, require_active_ticket_for_session
+
 from app.core.email_resend import send_email
 from app.core.email import render_template
+
+
 router = APIRouter(
     prefix="/api/v1/bookings",
     tags=["bookings"],
 )
 
+
+# -------------------------------------------------------------------
+# CREATE BOOKING
+# -------------------------------------------------------------------
 @router.post("/", response_model=BookingOut, status_code=status.HTTP_201_CREATED)
 def create_booking(
     session_id: int,
@@ -42,7 +47,7 @@ def create_booking(
         db=db,
     )
 
-    # ⏳ Waiting list
+    # ⏳ WAITING LIST
     if session.booked_count >= session.capacity:
         booking = Booking(
             user_id=current_user.id,
@@ -54,7 +59,7 @@ def create_booking(
         db.refresh(booking)
         return booking
 
-    # ✅ Active booking
+    # ✅ ACTIVE BOOKING
     booking = Booking(
         user_id=current_user.id,
         session_id=session_id,
@@ -78,8 +83,31 @@ def create_booking(
     db.commit()
     db.refresh(booking)
 
+    # 📧 EMAIL — NEVER BREAK FLOW
+    try:
+        html = render_template(
+            "booking_confirmation.html",
+            email=current_user.email,
+            class_name=session.class_type.name,
+            date=session.start_time.strftime("%d.%m.%Y"),
+            time=session.start_time.strftime("%H:%M"),
+            center_name=session.center.name,
+        )
+
+        send_email(
+            to_email=current_user.email,
+            subject="Booking confirmed ✅",
+            html_body=html,
+        )
+    except Exception as e:
+        print("Booking email failed:", e)
+
     return booking
 
+
+# -------------------------------------------------------------------
+# CANCEL BOOKING
+# -------------------------------------------------------------------
 @router.delete("/{booking_id}", status_code=200)
 def cancel_booking(
     booking_id: int,
@@ -149,7 +177,22 @@ def cancel_booking(
 
     db.commit()
 
+    # 📧 EMAIL (OPTIONAL)
+    try:
+        send_email(
+            to_email=current_user.email,
+            subject="Booking cancelled ❌",
+            html_body="<p>Your booking was successfully cancelled.</p>",
+        )
+    except Exception as e:
+        print("Cancel email failed:", e)
+
     return {"status": "cancelled"}
+
+
+# -------------------------------------------------------------------
+# MY BOOKINGS
+# -------------------------------------------------------------------
 @router.get("/me", response_model=list[BookingOut])
 def my_bookings(
     db: DBSession = Depends(get_db),
