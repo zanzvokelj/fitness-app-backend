@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session as DBSession
 from sqlalchemy.exc import IntegrityError
 
 from app.db import get_db
+from app.main import limiter
 from app.models.booking import Booking
 from app.models.session import Session
 from app.models.ticket import Ticket
@@ -24,6 +25,7 @@ router = APIRouter(
 # CREATE BOOKING
 # -------------------------------------------------------------------
 @router.post("/", response_model=BookingOut, status_code=status.HTTP_201_CREATED)
+@limiter.limit("10/minute")
 def create_booking(
     session_id: int,
     db: DBSession = Depends(get_db),
@@ -109,6 +111,7 @@ def create_booking(
 # CANCEL BOOKING
 # -------------------------------------------------------------------
 @router.delete("/{booking_id}", status_code=200)
+@limiter.limit("10/minute")
 def cancel_booking(
     booking_id: int,
     db: DBSession = Depends(get_db),

@@ -7,6 +7,7 @@ from fastapi import Depends, HTTPException, status
 from jose import jwt, JWTError
 from sqlalchemy.orm import Session
 from app.core.dependencies import require_admin
+from app.main import limiter
 from app.models.refresh_token import RefreshToken
 from app.core.security import create_refresh_token, refresh_token_expires
 from app.core.config import settings
@@ -25,6 +26,7 @@ router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
 
 @router.post("/login", response_model=Token)
+@limiter.limit("5/minute")
 def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db),
