@@ -2,7 +2,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from app.core.exceptions import register_exception_handlers
-
+from app.routers import ai_assistant
 from slowapi.middleware import SlowAPIMiddleware
 
 from app.core.limiter import limiter
@@ -50,6 +50,8 @@ app.include_router(ticket_plans.router)
 app.include_router(webhooks.router)
 app.include_router(orders.router)
 app.include_router(debug.router)
+
+app.include_router(ai_assistant.router)
 
 @app.get("/health")
 def health_check():
