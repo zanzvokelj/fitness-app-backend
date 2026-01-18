@@ -23,7 +23,7 @@ def create_booking(
     db: DBSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    # 🔒 Lock session row
+    # 🔒 Lock session
     session = (
         db.query(Session)
         .filter(Session.id == session_id, Session.is_active.is_(True))
@@ -34,14 +34,14 @@ def create_booking(
     if not session:
         raise HTTPException(status_code=404, detail="Session not available")
 
-    # 🎟️ Validate active ticket for this session/center
+    # 🎟️ Validate ticket
     ticket = require_active_ticket_for_session(
         session=session,
         current_user=current_user,
         db=db,
     )
 
-    # ⏳ WAITING LIST (NO ENTRY CONSUMPTION)
+    # ⏳ Waiting list
     if session.booked_count >= session.capacity:
         booking = Booking(
             user_id=current_user.id,
@@ -53,7 +53,7 @@ def create_booking(
         db.refresh(booking)
         return booking
 
-    # ✅ ACTIVE BOOKING
+    # ✅ Active booking
     booking = Booking(
         user_id=current_user.id,
         session_id=session_id,
@@ -63,7 +63,7 @@ def create_booking(
     db.add(booking)
     session.booked_count += 1
 
-    # 🎟️ CONSUME ENTRY (only for limited plans)
+    # 🎟️ Consume entry (only limited tickets)
     if ticket.remaining_entries is not None:
         ticket.remaining_entries -= 1
         if ticket.remaining_entries <= 0:
@@ -76,6 +76,7 @@ def create_booking(
 
     db.commit()
     db.refresh(booking)
+
     return booking
 
 @router.delete("/{booking_id}", status_code=200)
@@ -121,7 +122,7 @@ def cancel_booking(
     # ❌ Cancel booking
     booking.status = "cancelled"
 
-    # ✅ Samo če je bil ACTIVE
+    # ✅ Only if ACTIVE booking
     if was_active:
         session.booked_count -= 1
 
@@ -129,7 +130,7 @@ def cancel_booking(
             ticket.remaining_entries += 1
             ticket.is_active = True
 
-        # ⏫ Promote waiting user
+        # ⏫ Promote next waiting user
         next_waiting = (
             db.query(Booking)
             .filter(
@@ -146,6 +147,7 @@ def cancel_booking(
             session.booked_count += 1
 
     db.commit()
+
     return {"status": "cancelled"}
 @router.get("/me", response_model=list[BookingOut])
 def my_bookings(

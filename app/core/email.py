@@ -13,21 +13,24 @@ EMAIL_FROM = os.getenv("EMAIL_FROM")
 
 
 def send_email(*, to_email: str, subject: str, html_body: str) -> None:
-    # ✅ CHECK ŠELE TUKAJ
     if not all([SMTP_HOST, SMTP_USER, SMTP_PASSWORD, EMAIL_FROM]):
         print("SMTP not configured, skipping email")
         return
 
-    message = MIMEMultipart("alternative")
-    message["Subject"] = subject
-    message["From"] = EMAIL_FROM
-    message["To"] = to_email
-    message.attach(MIMEText(html_body, "html"))
+    try:
+        message = MIMEMultipart("alternative")
+        message["Subject"] = subject
+        message["From"] = EMAIL_FROM
+        message["To"] = to_email
+        message.attach(MIMEText(html_body, "html"))
 
-    with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
-        server.starttls()
-        server.login(SMTP_USER, SMTP_PASSWORD)
-        server.sendmail(SMTP_USER, [to_email], message.as_string())
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=10) as server:
+            server.starttls()
+            server.login(SMTP_USER, SMTP_PASSWORD)
+            server.sendmail(EMAIL_FROM, [to_email], message.as_string())
+
+    except Exception as e:
+        print("SMTP error:", e)
 
 
 TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates" / "emails"
