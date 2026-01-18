@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session as DBSession
 from sqlalchemy.exc import IntegrityError
 
 from app.db import get_db
-from app.main import limiter
+from app.core.limiter import limiter
 from app.models.booking import Booking
 from app.models.session import Session
 from app.models.ticket import Ticket

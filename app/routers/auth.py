@@ -7,7 +7,7 @@ from fastapi import Depends, HTTPException, status
 from jose import jwt, JWTError
 from sqlalchemy.orm import Session
 from app.core.dependencies import require_admin
-from app.main import limiter
+from app.core.limiter import limiter
 from app.models.refresh_token import RefreshToken
 from app.core.security import create_refresh_token, refresh_token_expires
 from app.core.config import settings
