@@ -24,11 +24,16 @@ def ai_recommendation(
     current_user: User = Depends(get_current_user),
 ):
     # 1️⃣ Load data
-    sessions = (
-        db.query(TrainingSession)
-        .filter(TrainingSession.is_active.is_(True))
-        .all()
+    query = db.query(TrainingSession).filter(
+        TrainingSession.is_active.is_(True)
     )
+
+    if data.preferred_center_id:
+        query = query.filter(
+            TrainingSession.center_id == data.preferred_center_id
+        )
+
+    sessions = query.all()
 
     plans = (
         db.query(TicketPlan)
