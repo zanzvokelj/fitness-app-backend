@@ -91,7 +91,7 @@ def create_booking(
             class_name=session.class_type.name,
             date=session.start_time.strftime("%d.%m.%Y"),
             time=session.start_time.strftime("%H:%M"),
-            center_name=session.center.name,
+            center_name=session.class_type.center.name,
         )
 
         send_email(
