@@ -11,7 +11,8 @@ from app.models.user import User
 from app.models.ticket import Ticket
 from app.schemas.booking import BookingOut
 from app.core.dependencies import get_current_user
-
+from app.core.email_resend import send_email
+from app.core.email import render_template
 router = APIRouter(
     prefix="/api/v1/bookings",
     tags=["bookings"],

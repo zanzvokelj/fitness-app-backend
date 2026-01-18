@@ -1,13 +1,17 @@
 from fastapi import APIRouter
-from app.core.email import send_email
+
+from app.core.email_resend import send_email
+from app.main import app
 
 router = APIRouter(tags=["debug"])
 
-@router.get("/test-email")
+
+
+@app.get("/test-email")
 def test_email():
     send_email(
-        to_email="zan.fitness.app@gmail.com",  # ← tvoj email
-        subject="SMTP TEST ✅",
-        html_body="<h1>Hello SMTP</h1><p>If you see this, email works.</p>",
+        to_email="zan.fitness.app@gmail.com",
+        subject="Resend test ✅",
+        html_body="<h1>Email works!</h1>",
     )
     return {"ok": True}
