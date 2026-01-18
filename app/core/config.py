@@ -24,6 +24,19 @@ class Settings(BaseSettings):
     STRIPE_SECRET_KEY: str = Field(..., env="STRIPE_SECRET_KEY")
     STRIPE_WEBHOOK_SECRET: str = Field(..., env="STRIPE_WEBHOOK_SECRET")
 
+    # 🔽 EMAIL / SMTP (TO MANJKA)
+    SMTP_HOST: str | None = Field(default=None, env="SMTP_HOST")
+    SMTP_PORT: int | None = Field(default=None, env="SMTP_PORT")
+    SMTP_USER: str | None = Field(default=None, env="SMTP_USER")
+    SMTP_PASSWORD: str | None = Field(default=None, env="SMTP_PASSWORD")
+    EMAIL_FROM: str | None = Field(default=None, env="EMAIL_FROM")
+
+    # 🔽 OPENAI (TO MANJKA)
+    OPENAI_API_KEY: str | None = Field(default=None, env="OPENAI_API_KEY")
+
+    # 🔽 RESEND (EMAIL API)
+    RESEND_API_KEY: str | None = Field(default=None, env="RESEND_API_KEY")
+
     class Config:
         env_file = ".env"
         extra = "forbid"
