@@ -1,45 +1,75 @@
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field
+from typing import Optional
 
 
 class Settings(BaseSettings):
+    """
+    Central application configuration.
+
+    Values are loaded from environment variables and .env file.
+    Extra variables are forbidden to avoid misconfiguration.
+    """
+
+    # -------------------------------------------------
     # App
-    PROJECT_NAME: str = "Group Training Booking API"
+    # -------------------------------------------------
+    PROJECT_NAME: str = "Group Fitness Booking API"
     API_V1_STR: str = "/api/v1"
 
+    # -------------------------------------------------to j
     # Frontend
-    FRONTEND_URL: str = Field(..., env="FRONTEND_URL")
-    DEFAULT_LOCALE: str = Field("si", env="DEFAULT_LOCALE")
+    # -------------------------------------------------
+    FRONTEND_URL: str = Field(..., validation_alias="FRONTEND_URL")
+    DEFAULT_LOCALE: str = Field("si", validation_alias="DEFAULT_LOCALE")
 
-    # Security
-    SECRET_KEY: str = Field(..., env="SECRET_KEY")
+    # -------------------------------------------------
+    # Security / Auth
+    # -------------------------------------------------
+    SECRET_KEY: str = Field(..., validation_alias="SECRET_KEY")
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
 
+    # -------------------------------------------------
     # Database
-    DATABASE_URL: str = Field(..., env="DATABASE_URL")
-    TEST_DATABASE_URL: str | None = Field(default=None, env="TEST_DATABASE_URL")
+    # -------------------------------------------------
+    DATABASE_URL: str = Field(..., validation_alias="DATABASE_URL")
+    TEST_DATABASE_URL: Optional[str] = Field(
+        default=None,
+        validation_alias="TEST_DATABASE_URL",
+    )
 
-    # Stripe
-    STRIPE_SECRET_KEY: str = Field(..., env="STRIPE_SECRET_KEY")
-    STRIPE_WEBHOOK_SECRET: str = Field(..., env="STRIPE_WEBHOOK_SECRET")
+    # -------------------------------------------------
+    # Payments (Stripe)
+    # -------------------------------------------------
+    STRIPE_SECRET_KEY: str = Field(..., validation_alias="STRIPE_SECRET_KEY")
+    STRIPE_WEBHOOK_SECRET: str = Field(..., validation_alias="STRIPE_WEBHOOK_SECRET")
 
-    # 🔽 EMAIL / SMTP (TO MANJKA)
-    SMTP_HOST: str | None = Field(default=None, env="SMTP_HOST")
-    SMTP_PORT: int | None = Field(default=None, env="SMTP_PORT")
-    SMTP_USER: str | None = Field(default=None, env="SMTP_USER")
-    SMTP_PASSWORD: str | None = Field(default=None, env="SMTP_PASSWORD")
-    EMAIL_FROM: str | None = Field(default=None, env="EMAIL_FROM")
+    # -------------------------------------------------
+    # Email / SMTP
+    # -------------------------------------------------
+    SMTP_HOST: Optional[str] = Field(default=None, validation_alias="SMTP_HOST")
+    SMTP_PORT: Optional[int] = Field(default=None, validation_alias="SMTP_PORT")
+    SMTP_USER: Optional[str] = Field(default=None, validation_alias="SMTP_USER")
+    SMTP_PASSWORD: Optional[str] = Field(default=None, validation_alias="SMTP_PASSWORD")
+    EMAIL_FROM: Optional[str] = Field(default=None, validation_alias="EMAIL_FROM")
 
-    # 🔽 OPENAI (TO MANJKA)
-    OPENAI_API_KEY: str | None = Field(default=None, env="OPENAI_API_KEY")
+    # -------------------------------------------------
+    # AI / OpenAI
+    # -------------------------------------------------
+    OPENAI_API_KEY: Optional[str] = Field(
+        default=None,
+        validation_alias="OPENAI_API_KEY",
+    )
 
-    # 🔽 RESEND (EMAIL API)
-    RESEND_API_KEY: str | None = Field(default=None, env="RESEND_API_KEY")
-
-    class Config:
-        env_file = ".env"
-        extra = "forbid"
+    # -------------------------------------------------
+    # Pydantic settings behavior
+    # -------------------------------------------------
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="forbid",
+    )
 
 
 settings = Settings()
