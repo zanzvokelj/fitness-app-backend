@@ -13,6 +13,7 @@ EMAIL_FROM = os.getenv("EMAIL_FROM")
 
 
 def send_email(*, to_email: str, subject: str, html_body: str) -> None:
+    print("📧 send_email() CALLED", to_email)
     if not all([SMTP_HOST, SMTP_USER, SMTP_PASSWORD, EMAIL_FROM]):
         print("SMTP not configured, skipping email")
         return

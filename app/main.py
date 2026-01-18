@@ -8,6 +8,7 @@ from app.routers import tickets
 from app.routers import ticket_plans
 from app.routers import webhooks
 from app.core.config import settings
+from app.routers import debug
 app = FastAPI(title="Group Fitness Booking API")
 app.add_middleware(
     CORSMiddleware,
@@ -36,6 +37,7 @@ app.include_router(webhooks.router)
 
 app.include_router(orders.router)
 
+app.include_router(debug.router)
 
 @app.get("/health")
 def health_check():
