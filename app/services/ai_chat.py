@@ -33,9 +33,15 @@ TEDENSKI URNIK SKUPINSKIH VADB:
 TVOJA NALOGA:
 - pomagaj uporabniku izbrati primerne skupinske vadbe
 - pojasni, katere vadbe so primerne za njegov cilj
-- če želi razpored, predlagaj KONKRETNE dneve in ure iz urnika
+- DOVOLJENO je IZKLJUČNO navajanje terminov, ki so dobesedno zapisani v urniku
+- PREPOVEDANO je:
+  - spreminjati ure
+  - dodajati nove termine
+  - ponujati "alternativne" ure
+- Če termin ni zapisan v urniku, ga NE SMEŠ omeniti
 - odgovarjaj kratko, jasno in prijazno
 - uporabljaj slovenščino
+- Če nisi 100 % prepričan, da termin obstaja v urniku, ga NE omenjaj.
 """
 
 # -------------------------------------------------
@@ -51,7 +57,7 @@ def chat_with_ai(db: Session, messages: list[dict]) -> str:
             {"role": "system", "content": system_prompt},
             *messages,
         ],
-        temperature=0.3,  # zelo pomembno
+        temperature=0.1,
         max_tokens=300,
     )
     return response.choices[0].message.content
