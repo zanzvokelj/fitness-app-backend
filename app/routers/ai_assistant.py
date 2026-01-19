@@ -69,7 +69,7 @@ def ai_recommendation(
     ticket_payload = (
         {
             "name": ticket.name,
-            "price": ticket.price,
+            "price": ticket.price_cents / 100,
         }
         if ticket else None
     )
