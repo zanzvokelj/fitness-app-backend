@@ -1,41 +1,55 @@
-# app/ai/ticket_logic.py
+# app/ai/logic.py
+from datetime import date
+from collections import defaultdict
 
-from app.models.ticket_plan import TicketPlan
+from app.models.session import Session
+from app.ai.rules import GOAL_CLASS_PRIORITY, SUPPORT_CLASSES
 
 
-def recommend_ticket(
+def recommend_sessions(
     *,
+    goal: str,
     days_per_week: int,
-    plans: list[TicketPlan],
-) -> TicketPlan | None:
+    sessions: list[Session],
+) -> list[Session]:
     """
-    Recommend the most suitable ticket plan based on
-    desired training frequency.
-
-    Logic:
-    - Prefer unlimited plans
-    - Otherwise choose the smallest plan that covers monthly usage
+    Returns a list of concrete Session objects
     """
 
-    monthly_sessions = days_per_week * 4
+    priority = GOAL_CLASS_PRIORITY.get(goal, [])
 
-    # 1️⃣ Unlimited plans first
-    unlimited = [
-        p for p in plans
-        if p.is_active and p.max_entries is None
-    ]
-    if unlimited:
-        return unlimited[0]
-
-    # 2️⃣ Limited plans that fit usage
-    suitable = [
-        p for p in plans
-        if p.is_active
-        and p.max_entries is not None
-        and p.max_entries >= monthly_sessions
+    # filter only future sessions with free spots
+    available = [
+        s for s in sessions
+        if s.start_time.date() >= date.today()
+        and s.booked_count < s.capacity
     ]
 
-    if suitable:
-        return min(suitable, key=lambda p: p.max_entries)
+    # group sessions by class name
+    sessions_by_class = defaultdict(list)
+    for s in available:
+        sessions_by_class[s.class_type.name].append(s)
 
-    return None
+    selected = []
+    used_classes = set()
+
+    for class_name in priority:
+        if class_name not in sessions_by_class:
+            continue
+
+        for session in sessions_by_class[class_name]:
+            if len(selected) >= days_per_week:
+                break
+
+            # avoid same class twice if possible
+            if class_name in used_classes:
+                continue
+
+            selected.append(session)
+            used_classes.add(class_name)
+
+        if len(selected) >= days_per_week:
+            break
+
+    return selected
+
