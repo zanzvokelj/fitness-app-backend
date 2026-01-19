@@ -7,9 +7,10 @@ from app.models.session import Session as TrainingSession
 from app.models.ticket_plan import TicketPlan
 from app.models.user import User
 from app.core.dependencies import get_current_user
-from app.schemas.ai_assistant import AssistantRequest
+from app.schemas.ai_assistant import AssistantRequest, AiChatRequest
 from app.ai.logic import recommend_sessions
 from app.ai.ticket_logic import recommend_ticket
+from app.services.ai_chat import chat_with_ai
 from app.services.ai_fitness_assistant import (
     explain_recommendation,
     explain_recommendation_test,
@@ -120,3 +121,15 @@ def ai_recommendation(
 @router.get("/ai-test")
 def ai_test():
     return {"reply": explain_recommendation_test()}
+
+
+@router.post("/chat")
+@limiter.limit("10/minute")
+def ai_chat(
+    request: Request,
+    data: AiChatRequest,
+    current_user: User = Depends(get_current_user),
+):
+    messages = [m.model_dump() for m in data.messages]
+    reply = chat_with_ai(messages)
+    return {"reply": reply}
