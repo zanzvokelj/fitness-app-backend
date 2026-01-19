@@ -1,7 +1,6 @@
 from openai import OpenAI
 from app.core.config import settings
 
-# OpenAI client (safe for prod – AI is non-critical layer)
 client = OpenAI(api_key=settings.OPENAI_API_KEY)
 
 
@@ -14,88 +13,68 @@ def explain_recommendation(
     ticket: dict | None,
 ) -> str:
     """
-    Uses OpenAI to generate a human-friendly explanation
-    for the rule-based fitness recommendation.
-
-    IMPORTANT:
-    - AI is a non-critical layer
-    - Failure must NEVER break the API
+    Generates a human-friendly explanation for a WEEKLY training plan.
     """
 
+    # ✅ FIX: use day instead of date
     session_list = "\n".join(
-        f"- {s['class']} on {s['date']} at {s['time']}"
+        f"- {s['day']}: {s['class']} ob {s['time']}"
         for s in sessions
     )
 
     ticket_text = (
-        f"Recommended ticket: {ticket['name']} ({ticket['price']} €)"
+        f"{ticket['name']} ({ticket['price']} €) – {ticket.get('reason', '')}"
         if ticket
-        else "No ticket recommendation available."
+        else "Trenutno ni primerne karte."
     )
 
     prompt = f"""
-You are a professional fitness coach.
+Si profesionalni fitnes trener.
 
-User goal: {goal}
-Experience level: {experience_level}
-Trainings per week: {days_per_week}
+Cilj uporabnika: {goal}
+Stopnja izkušenosti: {experience_level}
+Vadbe na teden: {days_per_week}
 
-Recommended sessions:
+Tedenski plan vadb:
 {session_list}
 
+Priporočena karta:
 {ticket_text}
 
-Explain briefly:
-- why these sessions fit the goal
-- why this ticket makes sense
-- add one short motivational sentence
+Na kratko pojasni:
+- zakaj je ta razpored primeren
+- zakaj je karta smiselna
+- dodaj eno motivacijsko misel
 """
 
     try:
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
-                {
-                    "role": "system",
-                    "content": "You are a helpful fitness assistant.",
-                },
-                {
-                    "role": "user",
-                    "content": prompt,
-                },
+                {"role": "system", "content": "You are a helpful fitness assistant."},
+                {"role": "user", "content": prompt},
             ],
             temperature=0.6,
             max_tokens=200,
         )
-
         return response.choices[0].message.content
 
     except Exception:
-        # 🔐 Fallback – NEVER break core functionality
+        # 🔒 graceful fallback (VERY IMPORTANT for prod)
         return (
-            "These sessions are well balanced for your goal and weekly "
-            "schedule. Stay consistent, focus on proper recovery, "
-            "and remember that progress comes from regular effort."
+            "Izbran program ponuja dobro ravnovesje med intenzivnimi "
+            "in podporno-regeneracijskimi vadbami. "
+            "Doslednost je ključ do dolgoročnih rezultatov 💪"
         )
 
 
 def explain_recommendation_test() -> str:
-    """
-    Simple test call to verify OpenAI connectivity.
-    This endpoint is safe and isolated from core logic.
-    """
-
-    try:
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": "You are a helpful assistant."},
-                {"role": "user", "content": "Say hello in Slovenian."},
-            ],
-            max_tokens=20,
-        )
-
-        return response.choices[0].message.content
-
-    except Exception:
-        return "Pozdravljen! (AI trenutno ni na voljo)"
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "user", "content": "Pozdravi v slovenščini."},
+        ],
+        max_tokens=20,
+    )
+    return response.choices[0].message.content
