@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-
+from fastapi import Request
+from app.core.limiter import limiter
 from app.db import get_db
 from app.models.session import Session as TrainingSession
 from app.models.ticket_plan import TicketPlan
@@ -18,7 +19,9 @@ router = APIRouter(prefix="/api/v1/ai", tags=["AI Assistant"])
 
 
 @router.post("/recommend")
+@limiter.limit("5/minute")
 def ai_recommendation(
+    request: Request,
     data: AssistantRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
