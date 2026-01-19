@@ -1,5 +1,6 @@
 # app/services/ai_chat.py
-
+from sqlalchemy.orm import Session
+from app.services.schedule_service import get_weekly_schedule_text
 from openai import OpenAI
 from typing import List, Dict
 
@@ -13,48 +14,44 @@ client = OpenAI(api_key=settings.OPENAI_API_KEY)
 # -------------------------------------------------
 # System prompt (VERY IMPORTANT)
 # -------------------------------------------------
-SYSTEM_PROMPT = """
-Si AI fitnes svetovalec za skupinske vadbe v fitnes centru.
+def build_system_prompt(schedule_text: str) -> str:
+    return f"""
+Si AI fitnes svetovalec znotraj aplikacije fitnes centra.
 
-POMEMBNA PRAVILA:
-- Svetuješ IZKLJUČNO glede skupinskih vadb (BodyPump, Core, Kickbox, BodyBalance)
-- NE predlagaš teka, uteži, vaj doma ali individualnih treningov
-- NE izmišljuješ vadb, terminov ali cen
-- Uporabljaš samo obstoječe tipe skupinskih vadb
-- Uporabljaš slovenščino
-- Odgovarjaš jasno, kratko in prijazno
+POMEMBNA PRAVILA (BREZ IZJEM):
+- Svetuješ IZKLJUČNO glede skupinskih vadb
+- Na voljo imaš SAMO spodnji urnik
+- Ne izmišljuješ terminov, vadb ali urnikov
+- Ne predlagaš teka, vaj doma ali individualnih treningov
+- Ne sprašuješ po imenu fitnes centra
+- Predpostaviš, da je uporabnik že v aplikaciji
+- Urnik je enak vsak teden
 
-Tvoja naloga:
+TEDENSKI URNIK SKUPINSKIH VADB:
+{schedule_text}
+
+TVOJA NALOGA:
 - pomagaj uporabniku izbrati primerne skupinske vadbe
 - pojasni, katere vadbe so primerne za njegov cilj
-- po potrebi predlagaj izdelavo TEDENSKEGA razporeda SKUPINSKIH VADB
-- postavljaj dodatna vprašanja, če podatki manjkajo
+- če želi razpored, predlagaj KONKRETNE dneve in ure iz urnika
+- odgovarjaj kratko, jasno in prijazno
+- uporabljaj slovenščino
 """
 
 # -------------------------------------------------
 # Chat function
 # -------------------------------------------------
-def chat_with_ai(messages: List[Dict[str, str]]) -> str:
-    """
-    Stateless AI chat.
-    Frontend sends full conversation context each time.
-    """
+def chat_with_ai(db: Session, messages: list[dict]) -> str:
+    schedule_text = get_weekly_schedule_text(db)
+    system_prompt = build_system_prompt(schedule_text)
 
-    try:
-        response = client.chat.completions.create(
-            model="gpt-4.1-mini",
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                *messages,
-            ],
-            temperature=0.7,
-            max_tokens=300,
-        )
-        return response.choices[0].message.content
-
-    except Exception:
-        # 🔒 production-safe fallback
-        return (
-            "Oprosti, trenutno imam težave pri odgovarjanju. "
-            "Poskusi znova čez trenutek."
-        )
+    response = client.chat.completions.create(
+        model="gpt-4.1-mini",
+        messages=[
+            {"role": "system", "content": system_prompt},
+            *messages,
+        ],
+        temperature=0.3,  # zelo pomembno
+        max_tokens=300,
+    )
+    return response.choices[0].message.content

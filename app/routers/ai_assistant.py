@@ -128,8 +128,9 @@ def ai_test():
 def ai_chat(
     request: Request,
     data: AiChatRequest,
+    db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     messages = [m.model_dump() for m in data.messages]
-    reply = chat_with_ai(messages)
+    reply = chat_with_ai(db, messages)
     return {"reply": reply}
