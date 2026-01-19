@@ -1,9 +1,7 @@
 # app/ai/logic.py
-from datetime import date
 from collections import defaultdict
-
 from app.models.session import Session
-from app.ai.rules import GOAL_CLASS_PRIORITY, SUPPORT_CLASSES
+from app.ai.rules import GOAL_CLASS_PRIORITY
 
 
 def recommend_sessions(
@@ -13,43 +11,33 @@ def recommend_sessions(
     sessions: list[Session],
 ) -> list[Session]:
     """
-    Returns a list of concrete Session objects
+    Weekly recommendation:
+    - max 1 session per weekday
+    - ignore capacity & dates
+    - follow goal priority
     """
 
     priority = GOAL_CLASS_PRIORITY.get(goal, [])
 
-    # filter only future sessions with free spots
-    available = [
-        s for s in sessions
-        if s.start_time.date() >= date.today()
-        and s.booked_count < s.capacity
-    ]
+    sessions_by_weekday: dict[int, list[Session]] = defaultdict(list)
+    for s in sessions:
+        sessions_by_weekday[s.start_time.weekday()].append(s)
 
-    # group sessions by class name
-    sessions_by_class = defaultdict(list)
-    for s in available:
-        sessions_by_class[s.class_type.name].append(s)
-
-    selected = []
-    used_classes = set()
+    selected: list[Session] = []
+    used_weekdays = set()
 
     for class_name in priority:
-        if class_name not in sessions_by_class:
-            continue
-
-        for session in sessions_by_class[class_name]:
+        for weekday in sorted(sessions_by_weekday.keys()):
             if len(selected) >= days_per_week:
-                break
+                return selected
 
-            # avoid same class twice if possible
-            if class_name in used_classes:
+            if weekday in used_weekdays:
                 continue
 
-            selected.append(session)
-            used_classes.add(class_name)
-
-        if len(selected) >= days_per_week:
-            break
+            for session in sessions_by_weekday[weekday]:
+                if session.class_type.name == class_name:
+                    selected.append(session)
+                    used_weekdays.add(weekday)
+                    break
 
     return selected
-
