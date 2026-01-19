@@ -35,7 +35,7 @@ def chat_with_ai(messages: List[Dict[str, str]]) -> str:
 
     try:
         response = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-4.1-mini",
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
                 *messages,

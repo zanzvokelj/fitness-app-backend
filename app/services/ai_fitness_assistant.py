@@ -49,7 +49,7 @@ Na kratko pojasni:
 
     try:
         response = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-4.1-mini",
             messages=[
                 {"role": "system", "content": "You are a helpful fitness assistant."},
                 {"role": "user", "content": prompt},
@@ -70,7 +70,7 @@ Na kratko pojasni:
 
 def explain_recommendation_test() -> str:
     response = client.chat.completions.create(
-        model="gpt-4o-mini",
+        model="gpt-4.1-mini",
         messages=[
             {"role": "system", "content": "You are a helpful assistant."},
             {"role": "user", "content": "Pozdravi v slovenščini."},
